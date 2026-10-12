@@ -40,7 +40,7 @@ if HERE not in sys.path:
 
 import oauth_gate  # noqa: E402
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 DEFAULT_PORT = 8765
 ROUTER_DIR_CANDIDATES = (
     os.path.join(os.path.dirname(HERE), "RevitMcpRouter"),             # Netbuild\scripts\RevitMcpRemote
@@ -91,6 +91,22 @@ def build_mcp(bridge, deny_tools=()):
     return mcp, ext
 
 
+def warm_router(bridge):
+    """Kick off Revit discovery in the background at startup so the first tool call after a
+    client connects doesn't pay the full pyRevit scan/probe cost. Best-effort, never fatal."""
+    router = getattr(bridge, "router", None)
+    if router is None or not hasattr(router, "discover"):
+        return
+
+    def _warm():
+        try:
+            router.discover(force=True)
+        except Exception:
+            pass
+
+    threading.Thread(target=_warm, daemon=True).start()
+
+
 def build_app(mcp, store):
     from starlette.applications import Starlette
     from starlette.routing import Mount
@@ -120,10 +136,17 @@ def find_cloudflared(explicit=None):
 
 def start_tunnel(kind, port, exe, name=None, public_url=None, mcp_path="/mcp"):
     origin = "http://127.0.0.1:%d" % port
+    # QUIC cuts a round trip off the TLS/connection handshake vs http2 and is Cloudflare's
+    # preferred transport; it falls back to http2 on its own if UDP/7844 is blocked.
+    proto = os.environ.get("RMR_TUNNEL_PROTOCOL", "quic").strip()
+    # Keep the edge<->origin HTTP connections warm so back-to-back tool calls reuse them.
+    tune = ["--proxy-keepalive-connections", os.environ.get("RMR_TUNNEL_KEEPALIVE", "8"),
+            "--proxy-keepalive-timeout", os.environ.get("RMR_TUNNEL_KEEPALIVE_TIMEOUT", "90s")]
+    flags = ["--no-autoupdate"] + (["--protocol", proto] if proto and proto != "auto" else [])
     if kind == "quick":
-        cmd = [exe, "tunnel", "--no-autoupdate", "--url", origin]
+        cmd = [exe, "tunnel"] + flags + tune + ["--url", origin]
     else:
-        cmd = [exe, "tunnel", "--no-autoupdate", "run", "--url", origin, name]
+        cmd = [exe, "tunnel"] + flags + ["run"] + tune + ["--url", origin, name]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, encoding="utf-8", errors="replace")
 
@@ -239,13 +262,18 @@ def main(argv=None):
         tunnel = start_tunnel(a.tunnel, a.port, exe, a.tunnel_name, a.public_url,
                               getattr(mcp.settings, "streamable_http_path", "/mcp"))
 
+    warm_router(bridge)
+
     import uvicorn
     _log("Revit MCP Remote %s on http://127.0.0.1:%d (%d tools, router: %s)"
          % (VERSION, a.port, len(mcp._tool_manager._tools), router_dir or a.bridge_module))
     try:
+        # timeout_keep_alive holds the edge<->origin connection open between tool calls so a
+        # burst of calls in one chat reuses it instead of re-handshaking each time.
         uvicorn.run(build_app(mcp, store), host="127.0.0.1", port=a.port,
                     log_level=os.environ.get("RMR_LOG_LEVEL", "warning"),
-                    proxy_headers=True, forwarded_allow_ips="127.0.0.1")
+                    proxy_headers=True, forwarded_allow_ips="127.0.0.1",
+                    timeout_keep_alive=int(os.environ.get("RMR_KEEPALIVE", "90")))
     finally:
         if tunnel and tunnel.poll() is None:
             tunnel.terminate()

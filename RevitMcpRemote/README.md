@@ -1,4 +1,4 @@
-# Revit MCP Remote (v0.1.0)
+# Revit MCP Remote (v0.2.0)
 
 The Revit MCP Router, reachable from **Claude on the web** (and desktop / mobile) as a custom connector.
 Same tools and the same session routing as the local router (`revit_list_sessions`, `revit_select_session`,
@@ -69,6 +69,9 @@ Claude Code (header auth, no browser sign-in):
 | `--deny-tools` / `RMR_DENY_TOOLS` | none | comma list of tools hidden from remote clients (e.g. code execution) |
 | `RMR_EXTRA_REDIRECTS` | none | extra OAuth redirect URI prefixes (Claude web + loopback are built in) |
 | `RMR_STATE_DIR` | `%LOCALAPPDATA%\RevitMcpRemote` | passphrase hash, clients, hashed tokens |
+| `RMR_TUNNEL_PROTOCOL` | quic | tunnel transport: `quic` (lowest latency, auto-falls back to http2), `http2`, or `auto` |
+| `RMR_KEEPALIVE` | 90 | seconds the edge↔server connection is held open between calls |
+| `RMR_TUNNEL_KEEPALIVE` / `RMR_TUNNEL_KEEPALIVE_TIMEOUT` | 8 / 90s | cloudflared origin keep-alive pool size / idle timeout |
 | `RMR_TUNNEL_VERBOSE` | off | show all cloudflared output |
 | `--rotate-token`, `--revoke-all` | | new static token; forget every client and token |
 
@@ -79,6 +82,10 @@ Claude Code (header auth, no browser sign-in):
   first in each chat.
 - **Long calls.** Cloudflare drops an HTTP response that sends nothing for ~100 s. Responses are streamed, but a single
   very long `revit_run_on_documents` over many models may still be cut; split big batches.
+- **Latency.** Most of the round trip is the hop to the nearest Cloudflare edge, so it won't match a local stdio
+  connection, but the tunnel runs over QUIC and holds connections open (`RMR_TUNNEL_PROTOCOL`, `RMR_KEEPALIVE`), the
+  tunnel process stays warm (no per-call cold start), and discovery is pre-warmed at startup so the first call is quick.
+  A named tunnel on your own domain usually lands on a closer, more stable edge than the quick tunnel.
 - **Work PC policy.** Exposing a work PC through a tunnel may need IT approval; the named-tunnel setup can also sit
   behind Cloudflare Access if your IT requires SSO in front of it.
 - **Security model.** Anyone who can type your passphrase on the sign-in page can drive Revit on this PC, including any
