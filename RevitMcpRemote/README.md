@@ -1,0 +1,93 @@
+# Revit MCP Remote (v0.1.0)
+
+The Revit MCP Router, reachable from **Claude on the web** (and desktop / mobile) as a custom connector.
+Same tools and the same session routing as the local router (`revit_list_sessions`, `revit_select_session`,
+`revit_status`, the multi-model tools and every pyRevit extension tool), served as a remote MCP server
+over Streamable HTTP instead of stdio.
+
+```
+Claude (claude.ai)  --HTTPS-->  Cloudflare Tunnel  -->  127.0.0.1:8765  [OAuth gate]
+                                                         --> bridge_core tools --> router --> Revit 48884..
+```
+
+- **Nothing is opened on the PC's network.** The server binds `127.0.0.1` only; `cloudflared` makes an
+  outbound connection to Cloudflare and is the only way in. No admin rights, no firewall rule.
+- **Every MCP request needs a bearer token.** Claude gets one through OAuth 2.1 (dynamic client registration +
+  PKCE S256): when you click *Connect* in Claude, a sign-in page served by this PC asks for **your passphrase**.
+  Tokens last 1 h and refresh for 30 days; `--revoke-all` signs everything out.
+- **The router source is not copied.** `revit_mcp_remote.py` imports `bridge_core.build_server()` from the
+  existing `scripts\RevitMcpRouter` folder, so routing fixes there apply here too, and the per-PC licence
+  check still applies.
+
+## Files
+
+| File | Role |
+|---|---|
+| `revit_mcp_remote.py` | entry point: loads the router's tools, serves HTTP, starts the tunnel, `--setup` / `--check` / `--revoke-all` |
+| `oauth_gate.py` | OAuth 2.1 server + bearer check in front of `/mcp` (stdlib + starlette) |
+| `Start Revit MCP Remote.cmd` | double-click launcher: first-run setup, then serve + quick tunnel |
+| `tests/test_remote.py` | 21-check end-to-end test against `tests/fake_bridge.py` (no Revit needed) |
+
+## Set up on the PC (once)
+
+1. Same Python the router uses (`py -3.14`, with `mcp[cli]<2` and `httpx`; `uvicorn`/`starlette` come with `mcp`).
+2. Install cloudflared: `winget install --id Cloudflare.cloudflared`, or put `cloudflared.exe` in this folder.
+3. Keep this folder beside `scripts\RevitMcpRouter` (Netbuild layout), or set `RMR_ROUTER_DIR`.
+4. `py -3.14 revit_mcp_remote.py --check` should list the tools and the routed Revit.
+
+## Use it
+
+1. Open Revit (MCP connector loaded), then double-click **Start Revit MCP Remote.cmd**.
+   First run asks for a passphrase (12+ chars) and prints a static token once (only for Claude Code / scripts).
+2. The window prints `Connector URL for Claude: https://<random>.trycloudflare.com/mcp`.
+3. claude.ai > **Settings > Connectors > Add custom connector** > paste the URL > **Connect** > enter the passphrase.
+4. In a chat: `revit_list_sessions`, then `revit_select_session doc:B002` as usual.
+
+Keep the window open while you work; closing it cuts Claude off.
+
+**The quick-tunnel URL changes every time you start it**, so the connector has to be edited each session.
+For a fixed URL, use a named Cloudflare tunnel on your own domain (free Cloudflare account):
+
+```
+cloudflared tunnel login
+cloudflared tunnel create revit-mcp
+cloudflared tunnel route dns revit-mcp revit.<yourdomain>
+py -3.14 revit_mcp_remote.py --tunnel named --tunnel-name revit-mcp --public-url https://revit.<yourdomain>
+```
+
+Claude Code (header auth, no browser sign-in):
+`claude mcp add --transport http revit-remote https://<host>/mcp --header "Authorization: Bearer <static token>"`
+
+## Options
+
+| Flag / env | Default | Meaning |
+|---|---|---|
+| `--port` / `RMR_PORT` | 8765 | local port (loopback only) |
+| `--tunnel` / `RMR_TUNNEL` | none (cmd: quick) | `quick`, `named` or `none` (bring your own tunnel) |
+| `--public-url` / `RMR_PUBLIC_URL` | from Host header | fixed public origin for OAuth metadata |
+| `--router-dir` / `RMR_ROUTER_DIR` | `..\scripts\RevitMcpRouter`, then `C:\SK\OneDrive\Netbuild\scripts\RevitMcpRouter` | where `bridge_core.py` lives |
+| `--deny-tools` / `RMR_DENY_TOOLS` | none | comma list of tools hidden from remote clients (e.g. code execution) |
+| `RMR_EXTRA_REDIRECTS` | none | extra OAuth redirect URI prefixes (Claude web + loopback are built in) |
+| `RMR_STATE_DIR` | `%LOCALAPPDATA%\RevitMcpRemote` | passphrase hash, clients, hashed tokens |
+| `RMR_TUNNEL_VERBOSE` | off | show all cloudflared output |
+| `--rotate-token`, `--revoke-all` | | new static token; forget every client and token |
+
+## Things to know
+
+- **One routing target for all connected chats.** The router keeps a single selected Revit per server process, so
+  `revit_select_session` in one Claude chat changes it for every chat using this connector. Run `revit_list_sessions`
+  first in each chat.
+- **Long calls.** Cloudflare drops an HTTP response that sends nothing for ~100 s. Responses are streamed, but a single
+  very long `revit_run_on_documents` over many models may still be cut; split big batches.
+- **Work PC policy.** Exposing a work PC through a tunnel may need IT approval; the named-tunnel setup can also sit
+  behind Cloudflare Access if your IT requires SSO in front of it.
+- **Security model.** Anyone who can type your passphrase on the sign-in page can drive Revit on this PC, including any
+  code-execution tool the extension provides. Use a long passphrase; 5 wrong attempts lock sign-in for 15 minutes.
+
+## Test
+
+```
+py -3.14 tests\test_remote.py
+```
+Covers: 401 + discovery, public-host metadata, redirect allow-list, wrong/locked passphrase, PKCE, single-use codes,
+MCP `tools/list` + call through the gate, refresh rotation, static token, revoke-all, deny-tools.
