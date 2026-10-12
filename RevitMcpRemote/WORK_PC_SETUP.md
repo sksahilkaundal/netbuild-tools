@@ -58,6 +58,22 @@ On the Work PC:
 Then in claude.ai: Settings -> Connectors -> Add custom connector -> that URL ->
 Connect -> passphrase (and SSO if you enabled Access).
 
+### Permanent URLs for several Revits at once
+
+To drive multiple Revit instances in parallel, each from its own Claude chat, with fixed
+URLs, add `--instances N` and give `--public-url` a `{n}` placeholder. One named tunnel
+then fronts every slot (the server writes the cloudflared ingress config and points DNS
+for each hostname on first run):
+
+```
+py -3.14 revit_mcp_remote.py --tunnel named --tunnel-name revit-mcp --instances 3 ^
+  --public-url "https://revit{n}.<yourdomain>" --no-exec --no-log --state-dir "%USERPROFILE%\.rmr"
+```
+
+This serves `https://revit1.<yourdomain>/mcp` … `revit3…/mcp` — add each as its own custom
+connector in Claude; each holds its own `revit_select_session`, so chat A can drive one
+Revit while chat B drives another, simultaneously. All slots share the one passphrase.
+
 ## 3. Privacy hardening on a managed PC
 
 The Work PC is owned by your company, so be clear-eyed about what "private" can and

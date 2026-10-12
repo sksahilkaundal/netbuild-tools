@@ -39,8 +39,10 @@ import secrets
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
+from urllib.parse import urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -48,7 +50,7 @@ if HERE not in sys.path:
 
 import oauth_gate  # noqa: E402
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 DEFAULT_PORT = 8765
 
 # Tools that run an arbitrary code string inside Revit. --no-exec hides these from the
@@ -194,6 +196,82 @@ def start_tunnel(kind, port, exe, name=None, public_url=None, mcp_path="/mcp", l
     return proc
 
 
+def slot_hosts(public_url, n):
+    """Expand a {n} template into n hostnames. 'https://revit{n}.example.com', 3 ->
+    ['revit1.example.com', 'revit2.example.com', 'revit3.example.com']. For n == 1 a
+    template without {n} is allowed and used as-is."""
+    tmpl = (public_url or "").strip()
+    if n > 1 and "{n}" not in tmpl:
+        return None
+    hosts = []
+    for k in range(1, n + 1):
+        url = tmpl.replace("{n}", str(k))
+        host = urlparse(url if "://" in url else "https://" + url).hostname
+        if not host:
+            return None
+        hosts.append(host)
+    return hosts
+
+
+def write_ingress_config(tunnel_name, hosts, base_port):
+    """A cloudflared ingress config mapping each hostname to a local slot port, so one named
+    tunnel fronts every slot. Returns the config file path (caller removes it)."""
+    lines = ["tunnel: %s" % tunnel_name, "ingress:"]
+    for i, host in enumerate(hosts):
+        lines.append("  - hostname: %s" % host)
+        lines.append("    service: http://127.0.0.1:%d" % (base_port + i))
+    lines.append("  - service: http_status:404")
+    fd, path = tempfile.mkstemp(prefix="rmr_ingress_", suffix=".yml")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+    return path
+
+
+def route_dns(exe, tunnel_name, hosts):
+    """Point each hostname's DNS at the tunnel (idempotent: 'already exists' is fine)."""
+    for host in hosts:
+        try:
+            r = subprocess.run([exe, "tunnel", "route", "dns", tunnel_name, host],
+                               capture_output=True, text=True, timeout=30)
+            out = (r.stdout + r.stderr).strip().splitlines()
+            msg = out[-1] if out else ""
+            if r.returncode == 0:
+                _log("DNS route ready: %s" % host)
+            elif "already exists" in msg.lower() or "record with that host" in msg.lower():
+                _log("DNS route already present: %s" % host)
+            else:
+                _log("DNS route for %s may need manual setup: %s" % (host, msg))
+        except Exception as e:
+            _log("DNS route for %s could not be set automatically (%s); run "
+                 "'cloudflared tunnel route dns %s %s' yourself." % (host, e, tunnel_name, host))
+
+
+def start_named_tunnel_multi(exe, tunnel_name, config_path, hosts, mcp_path="/mcp"):
+    """One `cloudflared tunnel run` using the ingress config, fronting every slot."""
+    proto = os.environ.get("RMR_TUNNEL_PROTOCOL", "quic").strip()
+    tune = ["--proxy-keepalive-connections", os.environ.get("RMR_TUNNEL_KEEPALIVE", "8"),
+            "--proxy-keepalive-timeout", os.environ.get("RMR_TUNNEL_KEEPALIVE_TIMEOUT", "90s")]
+    flags = ["--no-autoupdate"] + (["--protocol", proto] if proto and proto != "auto" else [])
+    cmd = [exe, "tunnel", "--config", config_path] + flags + ["run"] + tune + [tunnel_name]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace")
+
+    def pump():
+        for line in proc.stdout:
+            if os.environ.get("RMR_TUNNEL_VERBOSE") or "ERR" in line:
+                _log("cloudflared: " + line.rstrip())
+        _log("cloudflared exited (code %s) - Claude can no longer reach this PC." % proc.poll())
+
+    threading.Thread(target=pump, daemon=True).start()
+    bar = "=" * 72
+    for i, host in enumerate(hosts):
+        _log("\n%s\n  Connector URL for Claude (Revit slot %d of %d):  https://%s%s\n"
+             "  Claude > Settings > Connectors > Add custom connector, paste it,\n"
+             "  then Connect and enter your passphrase.\n%s"
+             % (bar, i + 1, len(hosts), host, mcp_path, bar))
+    return proc
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -229,16 +307,23 @@ def run_multi(a, router_dir, n):
         return 2
 
     exe = None
-    if a.tunnel == "quick":
+    named_hosts = None
+    named_config = None
+    if a.tunnel in ("quick", "named"):
         exe = find_cloudflared(a.cloudflared)
         if not exe:
             _log("FATAL: cloudflared not found. Install it (winget install --id Cloudflare.cloudflared) "
                  "or drop cloudflared.exe next to this script.")
             return 2
-    elif a.tunnel == "named":
-        _log("FATAL: --instances with --tunnel named needs one hostname per slot; run each slot "
-             "manually with its own --tunnel-name/--public-url, or use --tunnel quick. See README.")
-        return 2
+    if a.tunnel == "named":
+        if not a.tunnel_name:
+            _log("FATAL: --tunnel named needs --tunnel-name (the cloudflared tunnel you created).")
+            return 2
+        named_hosts = slot_hosts(a.public_url, n)
+        if not named_hosts:
+            _log("FATAL: --tunnel named with --instances %d needs --public-url with a {n} placeholder, "
+                 'e.g. --public-url "https://revit{n}.yourdomain.com" (one hostname per slot).' % n)
+            return 2
 
     workers, tunnels = [], []
 
@@ -259,6 +344,10 @@ def run_multi(a, router_dir, n):
             workers.append(spawn_worker(port))
             if a.tunnel == "quick":
                 tunnels.append(start_tunnel("quick", port, exe, label="Revit slot %d of %d" % (k + 1, n)))
+        if a.tunnel == "named":
+            route_dns(exe, a.tunnel_name, named_hosts)
+            named_config = write_ingress_config(a.tunnel_name, named_hosts, a.port)
+            tunnels.append(start_named_tunnel_multi(exe, a.tunnel_name, named_config, named_hosts))
         _log("Revit MCP Remote %s - %d independent slots on ports %d-%d. Each connector URL above "
              "is a separate Revit selection; set each with revit_select_session in its own chat."
              % (VERSION, n, a.port, a.port + n - 1))
@@ -278,6 +367,9 @@ def run_multi(a, router_dir, n):
         for p in tunnels + workers:
             if p.poll() is None:
                 p.terminate()
+        if named_config:
+            with contextlib.suppress(OSError):
+                os.remove(named_config)
     return 0
 
 

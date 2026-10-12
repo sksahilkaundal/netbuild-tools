@@ -192,6 +192,20 @@ def main():
         if saved is not None:
             os.environ["RMR_STATE_DIR"] = saved
 
+    # 14. named multi-instance: {n} template expands to one hostname per slot
+    hosts = rmr.slot_hosts("https://revit{n}.example.com", 3)
+    check("14 slot_hosts expands template", hosts == ["revit1.example.com", "revit2.example.com", "revit3.example.com"], hosts)
+    check("14b slot_hosts needs {n} for N>1", rmr.slot_hosts("https://revit.example.com", 3) is None)
+    check("14c slot_hosts allows bare host for N=1", rmr.slot_hosts("https://revit.example.com", 1) == ["revit.example.com"])
+
+    # 15. ingress config maps each hostname to its slot port + has a catch-all
+    cfgp = rmr.write_ingress_config("revit-mcp", ["revit1.example.com", "revit2.example.com"], 8765)
+    cfg = open(cfgp).read()
+    os.remove(cfgp)
+    check("15 ingress config", "tunnel: revit-mcp" in cfg and "revit1.example.com" in cfg
+          and "http://127.0.0.1:8765" in cfg and "http://127.0.0.1:8766" in cfg
+          and "http_status:404" in cfg, cfg)
+
     print("\nALL PASSED" if not failures else "\nFAILED: %s" % ", ".join(failures))
     return 1 if failures else 0
 

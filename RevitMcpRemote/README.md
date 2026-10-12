@@ -1,4 +1,4 @@
-# Revit MCP Remote (v0.4.0)
+# Revit MCP Remote (v0.5.0)
 
 The Revit MCP Router, reachable from **Claude on the web** (and desktop / mobile) as a custom connector.
 Same tools and the same session routing as the local router (`revit_list_sessions`, `revit_select_session`,
@@ -87,8 +87,17 @@ Claude Code (header auth, no browser sign-in):
   own custom connector in Claude; then chat A on slot 1 can hold `doc:B001` while chat B on slot 2 holds `doc:B002`,
   simultaneously. All slots share one passphrase. Example:
   `py -3.14 revit_mcp_remote.py --tunnel quick --instances 4` prints four URLs labelled "Revit slot 1 of 4", etc.
-  (Named tunnels need one hostname per slot — run each slot manually with its own `--tunnel-name`/`--public-url`, or
-  use `--tunnel none --instances N` behind your own reverse proxy.)
+- **Permanent URLs + several Revits — `--tunnel named --instances N`.** For fixed URLs that survive restarts, one
+  named tunnel can front every slot. Give `--public-url` a `{n}` placeholder (one hostname per slot) and the server
+  writes a cloudflared ingress config, points DNS for each hostname, and runs a single tunnel:
+  ```
+  py -3.14 revit_mcp_remote.py --tunnel named --tunnel-name revit-mcp --instances 3 \
+    --public-url "https://revit{n}.yourdomain.com" --no-exec --no-log
+  ```
+  That serves `https://revit1.yourdomain.com/mcp` … `revit3…/mcp`, each its own Revit selection. One-time prep:
+  a free Cloudflare account, your own domain, and `cloudflared tunnel login && cloudflared tunnel create revit-mcp`
+  (the DNS routes are created for you on first run; you can also pre-create them with `cloudflared tunnel route dns`).
+  All slots share one passphrase. (For N=1 a plain `--public-url https://revit.yourdomain.com` works with no placeholder.)
 - **Long calls.** Cloudflare drops an HTTP response that sends nothing for ~100 s. Responses are streamed, but a single
   very long `revit_run_on_documents` over many models may still be cut; split big batches.
 - **Latency.** Most of the round trip is the hop to the nearest Cloudflare edge, so it won't match a local stdio
