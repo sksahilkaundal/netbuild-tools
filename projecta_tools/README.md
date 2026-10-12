@@ -1,13 +1,13 @@
-# ProjectA Tools — ProjectA ACC Issue Report, portable for Windows (no admin rights)
+# ProjectA Tools — ProjectA ACC Issue Report + BUA / ProjectA Calculations, portable for Windows (no admin rights)
 
-One zip that runs the ProjectA ACC Issue Report pipeline (prompt **Ver. 05**) on any Windows PC:
+One zip that runs the ProjectA ACC Issue Report pipeline (prompt **Ver. 05**) and the BUA dated export → ProjectA Calculations workflow (`BUA_DatedExport_PromptTemplate.md`) on any Windows PC:
 no Python install, no admin rights and no internet needed on the PC.
 
 | In the zip | What it is |
 |---|---|
 | `runtime\` | Official python.org **embeddable Python 3.14** (win_amd64) plus pymupdf, reportlab, Pillow, pywin32, openpyxl and pip. Plain files only: no registry, no installer. |
 | `app\projecta_launcher.py` | Menu / command-line front end that runs your scripts unchanged. |
-| `Netbuild\` | The ProjectA issue scripts in the same layout as `C:\SK\OneDrive\Netbuild` (`ProjectA_IssueExport_Extract.py`, `ProjectA_IssueDetailReport_Build.py`, `scripts\ProjectA_IssueReport_Pipeline.py`, `scripts\ProjectA_IssueWalkthrough.py`, `scripts\ProjectA_IssueReport_Verify.py`) plus the two prompt templates under `docs\`. |
+| `Netbuild\` | The ProjectA issue scripts in the same layout as `C:\SK\OneDrive\Netbuild` (`ProjectA_IssueExport_Extract.py`, `ProjectA_IssueDetailReport_Build.py`, `scripts\ProjectA_IssueReport_Pipeline.py`, `scripts\ProjectA_IssueWalkthrough.py`, `scripts\ProjectA_IssueReport_Verify.py`) plus the two prompt templates under `docs\`. BUA: `scripts\bua_dated_export.py`, `scripts\projecta_calculations_build.py`; `BUA\` holds `update_bua_workbooks.py` + its two tracked 260702 template workbooks, and `BUA\templates\` the ProjectA Calculations style template. |
 | `ProjectA Issue Report.bat` | Starts the menu. Also runs portable, straight from the unzipped folder. |
 | `Install.bat` / `Uninstall.bat` | Per-user install to `%LOCALAPPDATA%\ProjectA_Tools`, with Start menu and Desktop shortcuts. |
 
@@ -55,6 +55,22 @@ How the prompt's steps map to the menu:
 
 Every step runs your scripts **unchanged**, in a fresh Python process, with the CONFIG globals set the way the prompt's "Commands behind the prompt" do. The exact code of each run is saved in `%LOCALAPPDATA%\ProjectA_Tools\user\runs\` and its full output in `...\logs\`.
 
+## Use — BUA dated export → ProjectA Calculations (menu 12–15)
+
+**Which BUA files it uses.** By default the launcher uses your live folders when they exist:
+- `C:\SK\Projects\ProjectA\Excel\BUA - Overall With Assets For MEP Team` (`update_bua_workbooks.py` + the 260702 templates);
+- `C:\SK\Projects\ProjectA\Excel\Templates\ProjectA Calculations template - ProjectC-Studio-SCH-AR-000001_00.xlsx`.
+
+Otherwise it uses the bundled copies. To change either, use menu 9.
+
+| Prompt (BUA_DatedExport) | Launcher |
+|---|---|
+| Raw path, back up that day's outputs before overwriting | **12** takes the raw `Excel - Area - Overall With Assets For MEP Team.xlsx` (or its folder) and the date (default today). Before any overwrite, the day's existing outputs are copied to `%LOCALAPPDATA%\ProjectA_Tools\user\backups\<now>_<date>\`. |
+| STEP 1 `bua_dated_export.py "<RAW>" [--overwrite]`; report tie-out / `!!!` banner rows / SKIPPED / MISMATCH; grouped vs itemized raw | **13** runs it and summarises the result: `ALL TOTALS TIE OUT - DONE` with overall BUA / GFA, the banner's likely Revit cause, the workbook to close, or MISMATCH guidance. A **grouped** raw is flagged and blocked from step 2. |
+| Raw replaces an earlier one of the same date: diff the Option 1 data sheets per asset / level / Function-Sub-function | **13** does it automatically after an overwrite. It lists the GFA / BUA changes per asset, level, Function-Sub and GLA/GSA tag; a −/+ pair on one level usually means a retag. |
+| STEP 2 `projecta_calculations_build.py` dry run, then write; carry the manual F&B / Retail Terraces; report "not placed exactly once" | **14** runs the dry run first and writes nothing if any row isn't placed exactly once. Then it asks, writes, and reports the carried terrace values. For a new date it carries them from the newest older ProjectA Calculations workbook. |
+| Compare with the previous ProjectA Calculations | **14** lists every Total and Efficiency line, previous vs new, using the builder's own formula evaluator. "Previous" is the replaced file, or the newest older one. |
+
 ## Use — command line (scripting, or Claude Code on the PC)
 
 ```bat
@@ -70,11 +86,18 @@ set ProjectA="%LOCALAPPDATA%\ProjectA_Tools\ProjectA Issue Report.bat"
 %ProjectA% verify                              &rem the folder just built (or --folder "<output folder>")
 %ProjectA% spotcheck
 %ProjectA% all --yes                           &rem extract -> pending -> build -> verify; --yes = leave un-noted blank
+
+rem BUA dated export -> ProjectA Calculations
+%ProjectA% bua-export --raw "C:\SK\Projects\ProjectA\Excel\261012\Excel - Area - Overall With Assets For MEP Team.xlsx"
+%ProjectA% projecta-calc                            &rem from the Option 1 just exported (or --option1 "<..._Option 1.xlsx>")
+%ProjectA% bua-all --overwrite                 &rem both steps; --overwrite = back up that day's outputs, then replace
 ```
 
 Options are remembered, so after the first `extract` the other steps need no arguments. Exit code 0 means OK; for `verify` it means `ALL CHECKS PASSED`.
 
 ## Notes
+
+- **Getting the zip onto another PC (e.g. your office PC):** save the downloaded files into your **OneDrive or Google Drive** folder. They sync to the other PC, where you join, unzip and run `Install.bat`.
 
 - **Python 3.14.7 here vs your `py -3.14`:** same major version. The bundled packages are pinned in `requirements.txt` (pymupdf 1.28.2, reportlab 5.0.1, Pillow 12.3.0). If your PC has older versions and you want byte-identical reports, run `py -3.14 -m pip freeze` on your PC, put those versions in `requirements.txt` and rebuild (below). Then re-run your regression harness (`_backups\2026-10-08_projecta-issue-scripts-pre-cleanup\regress.py` + `compare.py`).
 - **Walkthrough `next` / `goto`** reach Revit over the pyRevit MCP listener on `127.0.0.1:48884`, exactly as before. Revit must be open with the listener running.

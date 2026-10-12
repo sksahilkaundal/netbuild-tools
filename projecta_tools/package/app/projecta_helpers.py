@@ -117,3 +117,86 @@ def photo_spot_check(base, export, cap):
         files = sorted(f for f in os.listdir(after) if f.startswith(r["issue_id"] + "_photo")) if os.path.isdir(after) else []
         print("  #%s  photos=%s  %s" % (r["issue_id"], r["photo_count"], ", ".join(files) or "(no files in snapshots_after_photos)"))
     print("  photo folder: %s" % after)
+
+
+# ------------------------------------------------------------------ BUA / ProjectA Calculations
+def _projecta_totals(path):
+    """{label: column O value} for the Total / Efficiency rows of a workbook's ProjectA Calculations sheet,
+    evaluated with projecta_calculations_build's own formula evaluator (openpyxl files carry no cached values)."""
+    import openpyxl
+    import projecta_calculations_build as f
+    ws = openpyxl.load_workbook(path)[f.REF_SHEET]
+    ev, out, ctx = f.Evaluator(ws), {}, ""
+    for r in range(1, ws.max_row + 1):
+        lab = ws["F%d" % r].value
+        if isinstance(lab, str) and lab.startswith("="):           # mirror row: the denominator of the ratios below
+            ctx = str(ws[lab[1:]].value or "")
+            continue
+        if not isinstance(lab, str) or not ("Total" in lab or "Efficiency" in lab):
+            continue
+        key = "%s (/ %s)" % (lab.strip(), ctx) if "Efficiency" in lab else lab.strip()
+        try:
+            out.setdefault(key, ev.v("O%d" % r))
+        except Exception:                                          # noqa: BLE001 - a formula the evaluator can't read
+            pass
+    return out
+
+
+def projecta_compare(new, old):
+    """Total / Efficiency rows of two ProjectA Calculations workbooks, side by side."""
+    a, b = _projecta_totals(old), _projecta_totals(new)
+    print("ProjectA Calculations vs previous (column O, all assets)")
+    print("  previous: %s\n  new     : %s" % (old, new))
+    print("  %-70s %14s %14s %12s" % ("line", "previous", "new", "change"))
+    for k in list(b) + [k for k in a if k not in b]:
+        pv, nv = a.get(k), b.get(k)
+        pct = "Efficiency" in k
+        fmt = (lambda v: "-" if v is None else ("%.1f%%" % (100 * v) if pct else "{:,.2f}".format(v)))
+        if pv is None or nv is None:
+            ch = "new line" if pv is None else "removed"
+        else:
+            d = nv - pv
+            ch = ("%+.1f pt" % (100 * d)) if pct else "{:+,.2f}".format(d)
+            if abs(d) < (0.0005 if pct else 0.005):
+                ch = "="
+        print("  %-70s %14s %14s %12s" % (k[:70], fmt(pv), fmt(nv), ch))
+
+
+def option1_diff(old, new, limit=60):
+    """What changed between two Option 1 workbooks' data sheets, per asset / level / Function-Sub (+ GLA/GSA tag)."""
+    import openpyxl
+    from collections import defaultdict
+    import projecta_calculations_build as f
+
+    def agg(p):
+        wb = openpyxl.load_workbook(p, data_only=True)
+        d = defaultdict(lambda: [0.0, 0.0])
+        for x in f.load_rows(wb[f.find_data_sheet(wb).title]):
+            k = (x["sec"], str(x["lvl"]), x["c"], x["gsa"] or "")
+            d[k][0] += x["N"]
+            d[k][1] += x["O"]
+        return d
+    a, b = agg(old), agg(new)
+    ch = []
+    for k in set(a) | set(b):
+        dn, do = b[k][0] - a[k][0], b[k][1] - a[k][1]
+        if abs(dn) > 0.01 or abs(do) > 0.01:
+            ch.append((k, a[k] if k in a else None, b[k] if k in b else None, dn, do))
+    print("Option 1 data: what changed in Revit since the replaced export")
+    print("  previous: %s\n  new     : %s" % (old, new))
+    if not ch:
+        print("  no change in GFA / BUA per asset / level / Function-Sub-function / GLA-GSA tag")
+        return
+    sec = defaultdict(lambda: [0.0, 0.0])
+    for (s, _, _, _), _, _, dn, do in ch:
+        sec[s][0] += dn
+        sec[s][1] += do
+    print("  per asset: " + " | ".join("%s GFA %+.2f BUA %+.2f" % (s, round(v[0], 2) + 0.0, round(v[1], 2) + 0.0)
+                                for s, v in sorted(sec.items())))
+    print("  %-20s %-20s %-30s %-24s %10s %10s" % ("asset", "level", "Function-Sub", "GLA/GSA", "GFA chg", "BUA chg"))
+    for (s, lvl, c, g), pv, nv, dn, do in sorted(ch, key=lambda t: -abs(t[4]) - abs(t[3]))[:limit]:
+        tag = "" if pv and nv else ("  (new)" if not pv else "  (gone)")
+        print("  %-20s %-20s %-30s %-24s %+10.2f %+10.2f%s" % (s, lvl[:20], c[:30], g[:24], dn, do, tag))
+    if len(ch) > limit:
+        print("  ... %d more rows" % (len(ch) - limit))
+    print("  (a matching GFA - / + pair on the same level usually means a retag or an area moved between columns)")

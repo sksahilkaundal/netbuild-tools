@@ -8,10 +8,14 @@ with the portable Python bundled next to it: no admin rights, no system Python n
     "ProjectA Issue Report.bat" <step> [options]      one step, for scripting / Claude Code on the PC
 
     steps   : extract | pending | build | verify | spotcheck | all | walk <argv...>
+              bua-export | projecta-calc | bua-all       (BUA dated export -> ProjectA Calculations)
     options : --base "<BASE>"  --export YYYYMMDD  --pdf "<Issue detail-....pdf>"
               --bcf "<a.bcf>" [--bcf "<b.bcf>" ...]  --cap all|NNNN  --prev YYYYMMDD|none
               --folder "<output folder>" (verify)  --note "<supersede note>"  --yes (all: build
               even when issues have no Studio note = "leave blank")
+    BUA     : --raw "<Excel - Area - Overall With Assets For MEP Team.xlsx>"  --date YYMMDD (default today)
+              --overwrite (back up that day's outputs, then replace them)  --option1 "<..._Option 1.xlsx>"
+              --carry-from "<older ProjectA Calculations.xlsx>" (manual F&B / Retail Terraces for a new date)
     Options are remembered in %LOCALAPPDATA%\ProjectA_Tools\user\settings.json.
 
 Every step runs the user's own scripts UNCHANGED in a fresh Python process and sets their
@@ -20,20 +24,23 @@ CONFIG globals from here, exactly like the prompt's "Commands behind the prompt"
     <Netbuild>\scripts\ProjectA_IssueWalkthrough.py       pending / log / next / show / goto / bulk
     <Netbuild>\scripts\ProjectA_IssueReport_Verify.py     step 3 verify
     <Netbuild>\ProjectA_IssueExport_Extract.py, <Netbuild>\ProjectA_IssueDetailReport_Build.py
+    <Netbuild>\scripts\bua_dated_export.py         BUA step 1 (runs <BUA folder>\update_bua_workbooks.py)
+    <Netbuild>\scripts\projecta_calculations_build.py   BUA step 2 (style template: <ProjectA reference>)
 It never writes a Studio note by itself, never closes a PDF viewer and never edits the scripts.
+Before overwriting a day's BUA outputs it copies them to %LOCALAPPDATA%\ProjectA_Tools\user\backups.
 Each run is logged to %LOCALAPPDATA%\ProjectA_Tools\user\logs (full output + the exact code that ran).
 """
 import csv
-import datetime as dt
 import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
 
-VERSION = "1.0 (pipeline prompt Ver. 05)"
+VERSION = "1.1 (issue report prompt Ver. 05 + BUA / ProjectA Calculations)"
 APP = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.dirname(APP)
 BUNDLED_NETBUILD = os.path.join(PKG, "Netbuild")
@@ -42,6 +49,20 @@ USER = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "
 SETTINGS = os.path.join(USER, "settings.json")
 LOGS, RUNS = os.path.join(USER, "logs"), os.path.join(USER, "runs")
 SESSION_LOG = os.path.join(USER, "session_log.csv")
+BACKUPS = os.path.join(USER, "backups")
+# BUA dated export + ProjectA Calculations: live folders on SK's PC, bundled copies elsewhere
+LIVE_BUA = r"C:\SK\Projects\ProjectA\Excel\BUA - Overall With Assets For MEP Team"
+LIVE_BUA_EXCEL = r"C:\SK\Projects\ProjectA\Excel"
+LIVE_ProjectA_REF = r"C:\SK\Projects\ProjectA\Excel\Templates\ProjectA Calculations template - ProjectC-Studio-SCH-AR-000001_00.xlsx"
+BUNDLED_BUA = os.path.join(BUNDLED_NETBUILD, "BUA")
+BUNDLED_ProjectA_REF = os.path.join(BUNDLED_BUA, "templates", "ProjectA Calculations template - ProjectC-Studio-SCH-AR-000001_00.xlsx")
+BUA_SCRIPTS = [os.path.join("scripts", "bua_dated_export.py"), os.path.join("scripts", "projecta_calculations_build.py")]
+BUA_FILES = ["update_bua_workbooks.py",
+             "260702_ProjectB_Overall BUA_Space_Room Split_with All Levels_Option 1.xlsx",
+             "260702_ProjectB_Overall BUA_Space_Room Split_Raw Levels Only_Option 2.xlsx"]
+BUA_OUT = {"OPTION1": "%s_ProjectB_Overall BUA_Space_Room Split_with All Levels_Option 1.xlsx",
+           "OPTION2": "%s_ProjectB_Overall BUA_Space_Room Split_Raw Levels Only_Option 2.xlsx"}
+ProjectA_RE = re.compile(r"^\d{6}_ProjectB_Overall BUA_ProjectA Calculations\.xlsx$")
 
 SCRIPTS = {
     "pipeline": os.path.join("scripts", "ProjectA_IssueReport_Pipeline.py"),
@@ -53,7 +74,9 @@ SCRIPTS = {
 PACKAGES = ["reportlab", "pymupdf", "win32com", "PIL", "openpyxl"]
 DEFAULTS = {"netbuild_root": "", "base": r"C:\SK\Projects\ProjectA\Issues\260914", "export_subdir": "",
             "acc_pdf": "", "bcf": [], "max_issue_id": None, "previous_export_subdir": "",
-            "by_model": True, "out_date": "", "supersede_note": "", "last_output": "", "last_output_export": ""}
+            "by_model": True, "out_date": "", "supersede_note": "", "last_output": "", "last_output_export": "",
+            "bua_folder": "", "projecta_reference": "", "bua_raw": "", "bua_date": "", "bua_raw_kind": "",
+            "bua_last_option1": "", "bua_tied": False, "bua_last_projecta": ""}
 DATED = re.compile(r"^\d{8}$")
 OUT_RE = re.compile(r"^\d{8}_ProjectA_ACC Issue detail \(Issues \d+-\d+\)$")
 
@@ -546,8 +569,12 @@ def check(s):
     say("BASE     : %s  %s" % (s["base"], "ok" if os.path.isdir(s["base"]) else "NOT FOUND"))
     for n in ("core_tagging_completed.csv", "studio_notes_clean.csv"):
         say("  %-8s %s" % ("ok" if os.path.isfile(os.path.join(s["base"], n)) else "MISSING", n))
+    say("BUA      : %s%s" % (bua_folder(s), "  (bundled copy)" if bua_folder(s) == BUNDLED_BUA else ""))
+    say("ProjectA ref  : %s" % projecta_reference(s))
+    for p in [os.path.join(netbuild_root(s), r) for r in BUA_SCRIPTS] + [os.path.join(bua_folder(s), n) for n in BUA_FILES] + [projecta_reference(s)]:
+        say("  %-8s %s" % ("ok" if os.path.isfile(p) else "MISSING", os.path.basename(p)))
     rc, out = run_child(s, "check", CHECK, packages=PACKAGES)
-    good = rc == 0 and "MISSING" not in out and not missing_scripts(s)
+    good = rc == 0 and "MISSING" not in out and not missing_scripts(s) and not bua_missing(s)
     say("\n" + ("READY" if good else "NOT READY -- fix the MISSING items above"))
     return good
 
@@ -559,6 +586,12 @@ def settings_menu(s):
     v = ask("Netbuild root", s.get("netbuild_root") or "blank")
     s["netbuild_root"] = "" if v.lower() == "blank" else v
     s["base"] = ask("BASE", s["base"])
+    v = ask("BUA folder (update_bua_workbooks.py + 260702 templates; blank = %s if present, else bundled)" % LIVE_BUA,
+            s.get("bua_folder") or "blank")
+    s["bua_folder"] = "" if v.lower() == "blank" else v
+    v = ask("ProjectA Calculations style template (blank = %s if present, else bundled)" % LIVE_ProjectA_REF,
+            s.get("projecta_reference") or "blank")
+    s["projecta_reference"] = "" if v.lower() == "blank" else v
     s["by_model"] = yes("Also build the 'by Tier-Model' report (BY_MODEL)?", bool(s.get("by_model", True)))
     v = ask("OUT_DATE (YYYYMMDD to force the report date; blank = today)", s.get("out_date") or "blank")
     s["out_date"] = "" if v.lower() == "blank" else v
@@ -567,6 +600,235 @@ def settings_menu(s):
     s["supersede_note"] = "" if v.lower() == "blank" else v
     save_settings(s)
     check(s)
+
+
+# ------------------------------------------------------------------ BUA dated export + ProjectA Calculations
+BUA_RUN = '''import bua_dated_export as e
+e.BUA_FOLDER = %(bua)r
+e.SCRIPT = os.path.join(e.BUA_FOLDER, "update_bua_workbooks.py")
+sys.argv = ["bua_dated_export.py"] + %(argv)r
+e.main()
+'''
+
+ProjectA_RUN = '''import projecta_calculations_build as f
+sys.argv = ["projecta_calculations_build.py"] + %(argv)r
+f.main()
+'''
+
+
+def bua_folder(s):
+    """settings value, else the live BUA folder when it has the updater + templates, else the bundled copy."""
+    if s.get("bua_folder"):
+        return s["bua_folder"]
+    if all(os.path.isfile(os.path.join(LIVE_BUA, n)) for n in BUA_FILES):
+        return LIVE_BUA
+    return BUNDLED_BUA
+
+
+def projecta_reference(s):
+    if s.get("projecta_reference"):
+        return s["projecta_reference"]
+    return LIVE_ProjectA_REF if os.path.isfile(LIVE_ProjectA_REF) else BUNDLED_ProjectA_REF
+
+
+def bua_missing(s):
+    root, bua = netbuild_root(s), bua_folder(s)
+    miss = [os.path.join(root, r) for r in BUA_SCRIPTS if not os.path.isfile(os.path.join(root, r))]
+    miss += [os.path.join(bua, n) for n in BUA_FILES if not os.path.isfile(os.path.join(bua, n))]
+    return miss + ([] if os.path.isfile(projecta_reference(s)) else [projecta_reference(s)])
+
+
+def bua_date(s):
+    return s.get("bua_date") or time.strftime("%y%m%d")
+
+
+def bua_outputs(s):
+    d, date = os.path.dirname(s["bua_raw"]), bua_date(s)
+    return {k: os.path.join(d, v % date) for k, v in BUA_OUT.items()}
+
+
+def bua_ready(s):
+    miss = bua_missing(s)
+    if miss:
+        say("!!! missing for the BUA tools:\n    " + "\n    ".join(miss) + "\n    Fix the folders in Settings (menu 9).")
+        return False
+    if not s.get("bua_raw") or not os.path.isfile(s["bua_raw"]):
+        say("Set the raw Revit Area export first (menu 12, or --raw).")
+        return False
+    return True
+
+
+def backup_files(paths, date):
+    """Copy existing outputs to user\\backups\\<now>_<date>\\ before they are overwritten; returns {path: copy}."""
+    have = [p for p in paths if os.path.isfile(p)]
+    if not have:
+        return {}
+    d = os.path.join(BACKUPS, "%s_%s" % (time.strftime("%Y%m%d_%H%M%S"), date))
+    os.makedirs(d, exist_ok=True)
+    out = {}
+    for p in have:
+        out[p] = os.path.join(d, os.path.basename(p))
+        shutil.copy2(p, out[p])
+    say("Backed up %d existing output(s) to %s" % (len(out), d))
+    return out
+
+
+def setup_bua(s):
+    banner("BUA set-up  (the prompt's raw path)")
+    say("The itemized export of the Revit schedule 'Excel - Area - Overall With Assets For MEP Team'")
+    say("(host ProjectC-Studio-BIM-SW00-ZZZ-AR-970002 with 970001 linked), e.g.")
+    say("  C:\\SK\\Projects\\ProjectA\\Excel\\<YYMMDD>\\Excel - Area - Overall With Assets For MEP Team.xlsx")
+    raw = ask("Raw path (or its folder)", s.get("bua_raw") or LIVE_BUA_EXCEL)
+    if os.path.isdir(raw):
+        xs = sorted(n for n in os.listdir(raw) if n.lower().endswith(".xlsx") and n.startswith("Excel - "))
+        if not xs:
+            say("  !!! no 'Excel - *.xlsx' raw export in %s" % raw)
+            return False
+        raw = os.path.join(raw, xs[0] if len(xs) == 1 else choose("Raw export:", xs, 0, False))
+    if not os.path.isfile(raw):
+        say("  !!! not found: %s" % raw)
+        return False
+    s["bua_raw"] = raw
+    v = ask("Date prefix YYMMDD (Enter = today, %s)" % time.strftime("%y%m%d"), "")
+    s["bua_date"] = v if re.match(r"^\d{6}$", v) else ""
+    save_settings(s)
+    show_bua(s)
+    return True
+
+
+def show_bua(s):
+    say("  BUA raw  : %s" % (s.get("bua_raw") or "(not set -- choose 12)"))
+    if s.get("bua_raw"):
+        say("  Date     : %s%s" % (bua_date(s), "" if s.get("bua_date") else " (today)"))
+
+
+def step_bua_export(s, interactive=True, overwrite=False):
+    """STEP 1: raw -> dated Option 1 / Option 2. Returns the Option 1 path when ALL TOTALS TIE OUT."""
+    if not bua_ready(s):
+        return None
+    outs = bua_outputs(s)
+    banner("BUA STEP 1  dated export  --  %s" % s["bua_raw"])
+    existing = [p for p in outs.values() if os.path.isfile(p)]
+    backups = {}
+    if existing:
+        say("Outputs of %s already exist:\n  %s" % (bua_date(s), "\n  ".join(existing)))
+        if not (overwrite or (interactive and yes("Back them up and overwrite?", False))):
+            say("Nothing written (use --overwrite, or another --date).")
+            return None
+        backups = backup_files(existing, bua_date(s))
+    argv = [s["bua_raw"], "--date", bua_date(s)] + (["--overwrite"] if existing else [])
+    rc, out = run_child(s, "bua_export", BUA_RUN, bua=bua_folder(s), argv=argv)
+    s["bua_raw_kind"] = "grouped" if "raw is GROUPED" in out else ("itemized" if "raw is ITEMIZED" in out else "")
+    tied = rc == 0 and "ALL TOTALS TIE OUT - DONE" in out
+    say("\nResult:")
+    m = re.search(r"OVERALL\s+BUA=\s*([\d,.]+).*?GFA=\s*([\d,.]+)", out)
+    if tied:
+        say("  ALL TOTALS TIE OUT - DONE   overall BUA %s m2 | GFA %s m2" % (m.group(1), m.group(2)) if m else
+            "  ALL TOTALS TIE OUT - DONE")
+        for p in outs.values():
+            say("  %s" % p)
+    if "NEW ITEMS IN RAW" in out:
+        say("  !!! NEW components / categories in the raw (rows listed above). Usually bad data in Revit:\n"
+            "      blank Studio_Function Code -> no 'Function-' prefix, or a typo'd Studio_Sub-Function Code.\n"
+            "      Fix in Revit, re-export the raw and rerun with overwrite. Never add to the frozen lists without asking.")
+    if "SKIPPED" in out:
+        say("  !!! A dated output is open in Excel -- close it and rerun (the raw itself may stay open).")
+    if "*** MISMATCH ***" in out and "NEW ITEMS" not in out:
+        say("  !!! MISMATCH without a banner: a level the script can't place -- check TYPICAL / LEVEL_ALIASES /\n"
+            "      the basement prefixes at the top of update_bua_workbooks.py against the raw's Level names.")
+    if s["bua_raw_kind"] == "grouped":
+        say("  !!! The raw is GROUPED ('Itemize every instance' off): fine for Option 1 / 2, NOT for ProjectA Calculations.")
+    if not tied:
+        say("  -> stop here: don't modify the workbooks or scripts without checking the output above.")
+    s["bua_last_option1"] = outs["OPTION1"] if tied else ""
+    s["bua_tied"] = bool(tied)
+    save_settings(s)
+    old = backups.get(outs["OPTION1"])
+    if tied and old and s["bua_raw_kind"] == "itemized":
+        say("")
+        run_child(s, "bua_diff", "import projecta_helpers\nprojecta_helpers.option1_diff(%(old)r, %(new)r)\n",
+                  old=old, new=outs["OPTION1"])
+    return outs["OPTION1"] if tied else None
+
+
+def previous_projecta(s, out):
+    """Newest older '<YYMMDD>_ProjectB_Overall BUA_ProjectA Calculations.xlsx' in the raw's folder or its sibling dated folders."""
+    here = os.path.dirname(out)
+    parent = os.path.dirname(here)
+    cands = []
+    try:
+        sibs = sorted((os.path.join(parent, n) for n in os.listdir(parent) if os.path.isdir(os.path.join(parent, n))),
+                      reverse=True)
+    except OSError:
+        sibs = []
+    for d in [here] + sibs:
+        try:
+            for n in os.listdir(d):
+                if ProjectA_RE.match(n) and os.path.join(d, n) != out:
+                    cands.append((n[:6], os.path.join(d, n)))
+        except OSError:
+            pass
+    older = sorted((c for c in cands if c[0] <= os.path.basename(out)[:6]), reverse=True)
+    return older[0][1] if older else None
+
+
+def step_projecta(s, option1=None, interactive=True, overwrite=False, carry_from=None):
+    """STEP 2: dry run, then the ProjectA Calculations workbook next to Option 1; compare with the previous one."""
+    option1 = option1 or s.get("bua_last_option1")
+    if bua_missing(s):
+        return bua_ready(s)
+    if not option1 or not os.path.isfile(option1):
+        say("Run BUA STEP 1 first (it must tie out), or pass --option1 \"<..._Option 1.xlsx>\".")
+        return False
+    if s.get("bua_raw_kind") == "grouped" and option1 == s.get("bua_last_option1"):
+        say("!!! That Option 1 came from a GROUPED raw (GLA/GSA shows <varies>) -- re-export the raw itemized first.")
+        return False
+    if option1 == s.get("bua_last_option1") and not s.get("bua_tied"):
+        say("!!! STEP 1 did not tie out -- fix that first.")
+        return False
+    out = os.path.join(os.path.dirname(option1), "%s_ProjectB_Overall BUA_ProjectA Calculations.xlsx" % os.path.basename(option1)[:6])
+    prev = previous_projecta(s, out)
+    if not os.path.isfile(out) and not carry_from and prev:
+        carry_from = prev
+    banner("BUA STEP 2  ProjectA Calculations  --  dry run")
+    base_argv = [option1, "--out", out, "--reference", projecta_reference(s)] + (["--carry-from", carry_from] if carry_from else [])
+    rc, dry = run_child(s, "projecta_dry", ProjectA_RUN, argv=base_argv + ["--dry-run"])
+    if rc != 0 or "coverage: every m2" not in dry:
+        if "not placed exactly once" in dry:
+            say("\n!!! Rows above are not placed exactly once on an ProjectA line (a new GFA Component-Category).\n"
+                "    Decide which ProjectA line they belong to, or fix them in Revit, before the rules change. Nothing written.")
+        else:
+            say("\n!!! dry run failed -- see the output above. Nothing written.")
+        return False
+    backups = {}
+    if os.path.isfile(out):
+        if not (overwrite or (interactive and yes("\n%s exists. Back it up and overwrite?" % os.path.basename(out), False))):
+            say("Nothing written (use --overwrite).")
+            return False
+        backups = backup_files([out], os.path.basename(out)[:6])
+    elif interactive and not yes("\nDry run is clean. Write %s?" % os.path.basename(out)):
+        return False
+    banner("BUA STEP 2  ProjectA Calculations  --  write")
+    rc, res = run_child(s, "projecta_build", ProjectA_RUN, argv=base_argv + (["--overwrite"] if os.path.isfile(out) else []))
+    ok = rc == 0 and "ALL TOTALS TIE OUT - DONE" in res
+    say("\n" + ("ALL TOTALS TIE OUT - DONE  ->  %s" % out if ok else "*** ProjectA Calculations: CHECK THE OUTPUT ABOVE ***"))
+    if "SKIPPED" in res:
+        say("!!! The ProjectA Calculations workbook is open in Excel -- close it and rerun.")
+    if ok:
+        s["bua_last_projecta"] = out
+        save_settings(s)
+        prev_cmp = backups.get(out) or prev
+        if prev_cmp:
+            say("")
+            run_child(s, "projecta_compare", "import projecta_helpers\nprojecta_helpers.projecta_compare(%(new)r, %(old)r)\n",
+                      new=out, old=prev_cmp)
+    return ok
+
+
+def bua_all(s, interactive=True, overwrite=False):
+    opt1 = step_bua_export(s, interactive, overwrite)
+    if opt1:
+        step_projecta(s, opt1, interactive, overwrite)
 
 
 # ------------------------------------------------------------------ menu / CLI
@@ -582,6 +844,11 @@ MENU = """
  9  Settings + environment check
 10  After-photo spot-check list (issues with 2-3 photos)
 11  Open BASE / logs folder
+ -- BUA / ProjectA Calculations (BUA_DatedExport prompt) --
+12  Set the raw Revit Area export (+ date)
+13  BUA STEP 1  dated Option 1 / Option 2 export  (+ backup + what changed)
+14  BUA STEP 2  ProjectA Calculations  (dry run -> write -> compare with previous)
+15  BUA RUN BOTH: step 1 -> step 2
  0  Exit"""
 
 
@@ -590,6 +857,7 @@ def menu(s):
         banner("ProjectA Issue Report  --  ProjectF Sports Boulevard ProjectA TOWER    (ProjectA Tools %s)" % VERSION)
         say("  Scripts  : %s%s" % (netbuild_root(s), "  !!! missing: " + ", ".join(missing_scripts(s)) if missing_scripts(s) else ""))
         show_export(s)
+        show_bua(s)
         say(MENU)
         c = ask("\nChoose")
         if _EOF:
@@ -621,6 +889,14 @@ def menu(s):
             elif c == "11":
                 open_in_explorer(s["base"])
                 open_in_explorer(USER)
+            elif c == "12":
+                setup_bua(s)
+            elif c == "13":
+                step_bua_export(s)
+            elif c == "14":
+                step_projecta(s)
+            elif c == "15":
+                bua_all(s)
             elif c in ("0", "q", "exit"):
                 return
         except KeyboardInterrupt:
@@ -634,14 +910,15 @@ def parse_cli(argv, s):
     opts, rest, i = {}, [], 0
     while i < len(argv):
         a = argv[i]
-        if a in ("--base", "--export", "--pdf", "--cap", "--prev", "--folder", "--note") and i + 1 < len(argv):
+        if a in ("--base", "--export", "--pdf", "--cap", "--prev", "--folder", "--note", "--raw", "--date",
+                 "--option1", "--carry-from") and i + 1 < len(argv):
             opts[a] = argv[i + 1]
             i += 2
         elif a == "--bcf" and i + 1 < len(argv):
             opts.setdefault("--bcf", []).append(argv[i + 1])
             i += 2
-        elif a == "--yes":
-            opts["--yes"] = True
+        elif a in ("--yes", "--overwrite"):
+            opts[a] = True
             i += 1
         else:
             rest.append(a)
@@ -661,6 +938,10 @@ def parse_cli(argv, s):
         s["previous_export_subdir"] = "" if opts["--prev"].lower() == "none" else opts["--prev"]
     if "--note" in opts:
         s["supersede_note"] = opts["--note"]
+    if "--raw" in opts:
+        s["bua_raw"] = os.path.abspath(opts["--raw"])
+    if "--date" in opts:
+        s["bua_date"] = opts["--date"]
     return opts, rest
 
 
@@ -696,6 +977,13 @@ def main(argv):
     if cmd == "spotcheck":
         step_spotcheck(s)
         return 0
+    if cmd == "bua-export":
+        return 0 if step_bua_export(s, False, bool(opts.get("--overwrite"))) else 1
+    if cmd == "projecta-calc":
+        return 0 if step_projecta(s, opts.get("--option1"), False, bool(opts.get("--overwrite")), opts.get("--carry-from")) else 1
+    if cmd == "bua-all":
+        opt1 = step_bua_export(s, False, bool(opts.get("--overwrite")))
+        return 0 if opt1 and step_projecta(s, opt1, False, bool(opts.get("--overwrite"))) else 1
     if cmd == "all":
         run_all(s, interactive=False, leave_blank=bool(opts.get("--yes")))
         return 0
