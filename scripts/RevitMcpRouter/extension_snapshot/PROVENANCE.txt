@@ -1,0 +1,20 @@
+Snapshot of the pyRevit-side (Revit code) of the MCP extension, taken 2026-09-21 21:30.
+
+Source:   C:\Users\user\AppData\Roaming\pyRevit\Extensions\mcp-server-for-revit-python.extension
+Upstream: https://github.com/mcp-servers-for-revit/mcp-server-for-revit-python.git
+          commit 51b4829 (2026-07-26), MIT License (c) 2025 Juan Rodriguez - see LICENSE
+Local modifications on top of upstream (ours): local_modifications_vs_upstream.diff
+  - revit_mcp/gate.py (untracked, ours): pause/resume gate checked by every route
+  - revit_mcp/*.py: gate checks added
+  - main.py + revit_mcp_safety.py: hardened bridge (superseded by ../revit_mcp_bridge.py)
+  - pyproject.toml: httpx added as a real dependency
+
+What runs INSIDE Revit (IronPython, loaded by pyRevit at startup):
+  startup.py        registers routes.API("revit_mcp") on pyRevit's Routes HTTP server
+  revit_mcp/        the route handlers (status, model_info, views, placement, colors,
+                    code_execution, document, gate)
+What runs OUTSIDE Revit (CPython, the MCP bridge process):
+  tools/            the MCP tool definitions (imported unmodified by ../revit_mcp_bridge.py)
+
+Product note: pyRevit itself is GPL-3. The bridge (our code) talks to it over HTTP in a separate
+process; the Revit-side routes are MIT upstream + our additions. Keep that boundary when packaging.
