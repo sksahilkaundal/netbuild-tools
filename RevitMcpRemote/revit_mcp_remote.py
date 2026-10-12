@@ -33,6 +33,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -40,7 +41,7 @@ if HERE not in sys.path:
 
 import oauth_gate  # noqa: E402
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 DEFAULT_PORT = 8765
 ROUTER_DIR_CANDIDATES = (
     os.path.join(os.path.dirname(HERE), "RevitMcpRouter"),             # Netbuild\scripts\RevitMcpRemote
@@ -134,7 +135,7 @@ def find_cloudflared(explicit=None):
     return None
 
 
-def start_tunnel(kind, port, exe, name=None, public_url=None, mcp_path="/mcp"):
+def start_tunnel(kind, port, exe, name=None, public_url=None, mcp_path="/mcp", label=None):
     origin = "http://127.0.0.1:%d" % port
     # QUIC cuts a round trip off the TLS/connection handshake vs http2 and is Cloudflare's
     # preferred transport; it falls back to http2 on its own if UDP/7844 is blocked.
@@ -152,8 +153,9 @@ def start_tunnel(kind, port, exe, name=None, public_url=None, mcp_path="/mcp"):
 
     def announce(url):
         bar = "=" * 72
-        _log("\n%s\n  Connector URL for Claude:  %s%s\n  Claude > Settings > Connectors > Add custom connector, paste it,\n"
-             "  then Connect and enter your passphrase.\n%s" % (bar, url, mcp_path, bar))
+        tag = ("  (%s)" % label) if label else ""
+        _log("\n%s\n  Connector URL for Claude:  %s%s%s\n  Claude > Settings > Connectors > Add custom connector, paste it,\n"
+             "  then Connect and enter your passphrase.\n%s" % (bar, url, mcp_path, tag, bar))
 
     def pump():
         announced = False
@@ -200,6 +202,64 @@ def cmd_setup(store, rotate_only=False):
     return 0
 
 
+def run_multi(a, router_dir, n):
+    """Run n independent single-instance servers (ports a.port .. a.port+n-1), each its own OS
+    process so each keeps its OWN selected Revit, and front each with its own tunnel/URL. They
+    share the one auth store (same passphrase), so you sign in the same way on every slot."""
+    store = oauth_gate.Store()
+    if not store.configured:
+        _log("FATAL: no passphrase/token yet - run once with --setup.")
+        return 2
+
+    exe = None
+    if a.tunnel == "quick":
+        exe = find_cloudflared(a.cloudflared)
+        if not exe:
+            _log("FATAL: cloudflared not found. Install it (winget install --id Cloudflare.cloudflared) "
+                 "or drop cloudflared.exe next to this script.")
+            return 2
+    elif a.tunnel == "named":
+        _log("FATAL: --instances with --tunnel named needs one hostname per slot; run each slot "
+             "manually with its own --tunnel-name/--public-url, or use --tunnel quick. See README.")
+        return 2
+
+    workers, tunnels = [], []
+
+    def spawn_worker(port):
+        cmd = [sys.executable, os.path.abspath(__file__), "--instances", "1", "--tunnel", "none",
+               "--port", str(port), "--bridge-module", a.bridge_module, "--deny-tools", a.deny_tools]
+        if router_dir:
+            cmd += ["--router-dir", router_dir]
+        return subprocess.Popen(cmd)   # inherits env incl. shared RMR_STATE_DIR
+
+    try:
+        for k in range(n):
+            port = a.port + k
+            workers.append(spawn_worker(port))
+            if a.tunnel == "quick":
+                tunnels.append(start_tunnel("quick", port, exe, label="Revit slot %d of %d" % (k + 1, n)))
+        _log("Revit MCP Remote %s - %d independent slots on ports %d-%d. Each connector URL above "
+             "is a separate Revit selection; set each with revit_select_session in its own chat."
+             % (VERSION, n, a.port, a.port + n - 1))
+        if a.tunnel == "none":
+            for k in range(n):
+                _log("  slot %d: http://127.0.0.1:%d/mcp (bring your own tunnel)" % (k + 1, a.port + k))
+        # Wait on the workers; if one dies, stop.
+        while True:
+            dead = [w for w in workers if w.poll() is not None]
+            if dead:
+                _log("a slot server exited (code %s) - shutting the rest down." % dead[0].poll())
+                break
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        for p in tunnels + workers:
+            if p.poll() is None:
+                p.terminate()
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Revit MCP Remote %s" % VERSION)
     ap.add_argument("--setup", action="store_true", help="set the passphrase and a new static token")
@@ -216,6 +276,9 @@ def main(argv=None):
     ap.add_argument("--bridge-module", default=os.environ.get("RMR_BRIDGE_MODULE", "bridge_core"))
     ap.add_argument("--deny-tools", default=os.environ.get("RMR_DENY_TOOLS", ""),
                     help="comma list of tool names to hide from remote clients")
+    ap.add_argument("--instances", type=int, default=int(os.environ.get("RMR_INSTANCES", "1")),
+                    help="run N (1-10) independent servers, each its own connector URL and its own "
+                         "selected Revit, so N Claude chats can each drive a different Revit at once")
     a = ap.parse_args(argv)
 
     store = oauth_gate.Store()
@@ -230,6 +293,11 @@ def main(argv=None):
     if a.bridge_module == "bridge_core" and not router_dir:
         _log("FATAL: RevitMcpRouter folder (bridge_core.py) not found. Pass --router-dir or set RMR_ROUTER_DIR.")
         return 2
+
+    n = max(1, min(10, a.instances))
+    if n > 1 and not (a.setup or a.rotate_token or a.revoke_all or a.check):
+        return run_multi(a, router_dir, n)
+
     bridge = load_bridge(router_dir, a.bridge_module)
     deny = [t.strip() for t in a.deny_tools.split(",") if t.strip()]
     mcp, ext = build_mcp(bridge, deny)

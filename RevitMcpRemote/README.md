@@ -1,4 +1,4 @@
-# Revit MCP Remote (v0.2.0)
+# Revit MCP Remote (v0.3.0)
 
 The Revit MCP Router, reachable from **Claude on the web** (and desktop / mobile) as a custom connector.
 Same tools and the same session routing as the local router (`revit_list_sessions`, `revit_select_session`,
@@ -66,6 +66,7 @@ Claude Code (header auth, no browser sign-in):
 | `--tunnel` / `RMR_TUNNEL` | none (cmd: quick) | `quick`, `named` or `none` (bring your own tunnel) |
 | `--public-url` / `RMR_PUBLIC_URL` | from Host header | fixed public origin for OAuth metadata |
 | `--router-dir` / `RMR_ROUTER_DIR` | sibling `..\RevitMcpRouter`, `..\scripts\RevitMcpRouter`, then `C:\SK\OneDrive\Netbuild\scripts\RevitMcpRouter` | where `bridge_core.py` lives |
+| `--instances` / `RMR_INSTANCES` | 1 | run N (1–10) independent slots, each its own connector URL and its own selected Revit |
 | `--deny-tools` / `RMR_DENY_TOOLS` | none | comma list of tools hidden from remote clients (e.g. code execution) |
 | `RMR_EXTRA_REDIRECTS` | none | extra OAuth redirect URI prefixes (Claude web + loopback are built in) |
 | `RMR_STATE_DIR` | `%LOCALAPPDATA%\RevitMcpRemote` | passphrase hash, clients, hashed tokens |
@@ -77,9 +78,15 @@ Claude Code (header auth, no browser sign-in):
 
 ## Things to know
 
-- **One routing target for all connected chats.** The router keeps a single selected Revit per server process, so
-  `revit_select_session` in one Claude chat changes it for every chat using this connector. Run `revit_list_sessions`
-  first in each chat.
+- **One routing target per connector.** A single server keeps one selected Revit, so `revit_select_session` in one
+  Claude chat changes it for every chat using that connector URL. Run `revit_list_sessions` first in each chat.
+- **Driving several Revits at once — `--instances N` (up to 10).** This starts N independent servers (consecutive
+  ports) and N tunnels, so you get **N separate connector URLs, each with its own selected Revit**. Add each URL as its
+  own custom connector in Claude; then chat A on slot 1 can hold `doc:B001` while chat B on slot 2 holds `doc:B002`,
+  simultaneously. All slots share one passphrase. Example:
+  `py -3.14 revit_mcp_remote.py --tunnel quick --instances 4` prints four URLs labelled "Revit slot 1 of 4", etc.
+  (Named tunnels need one hostname per slot — run each slot manually with its own `--tunnel-name`/`--public-url`, or
+  use `--tunnel none --instances N` behind your own reverse proxy.)
 - **Long calls.** Cloudflare drops an HTTP response that sends nothing for ~100 s. Responses are streamed, but a single
   very long `revit_run_on_documents` over many models may still be cut; split big batches.
 - **Latency.** Most of the round trip is the hop to the nearest Cloudflare edge, so it won't match a local stdio
