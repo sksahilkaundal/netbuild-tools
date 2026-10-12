@@ -120,6 +120,24 @@ If a model physically has to be open on the Work PC and your logic has to run *i
 is no configuration that keeps that logic off the machine — that's a property of where Revit
 runs, not of this tool.
 
+## 4. One-click launch (and optional auto-start)
+
+Typing the command each time is optional. **`Start Revit MCP - skaec.cmd`** in this folder
+runs the full hardened named-tunnel command (edit `set SLOTS=10` at the top for how many
+Revits). Just double-click it; leave the window open while you work, close it to stop.
+
+To start it automatically when you log in (no admin needed):
+
+1. Press `Win+R`, type `shell:startup`, Enter — this opens your Startup folder.
+2. Right-drag `Start Revit MCP - skaec.cmd` into it and choose **Create shortcuts here**
+   (optionally set the shortcut's **Run: Minimized**).
+
+Trade-off to decide: auto-start means the tunnel is up for your whole login session, so the
+outbound connection is present (and observable on a managed network) even when you're not
+using Revit, and all the slot processes run from boot. On-demand (just double-clicking when
+you want to work, closing it after) keeps the connection up only while you're actually using
+it — a smaller, shorter-lived footprint. Pick on-demand if you'd rather it not run all day.
+
 ## Notes
 
 - `--deny-tools execute_revit_code` (or any tool name) hides individual tools from the remote
