@@ -1,4 +1,4 @@
-# Revit MCP Remote (v0.3.0)
+# Revit MCP Remote (v0.4.0)
 
 The Revit MCP Router, reachable from **Claude on the web** (and desktop / mobile) as a custom connector.
 Same tools and the same session routing as the local router (`revit_list_sessions`, `revit_select_session`,
@@ -68,8 +68,10 @@ Claude Code (header auth, no browser sign-in):
 | `--router-dir` / `RMR_ROUTER_DIR` | sibling `..\RevitMcpRouter`, `..\scripts\RevitMcpRouter`, then `C:\SK\OneDrive\Netbuild\scripts\RevitMcpRouter` | where `bridge_core.py` lives |
 | `--instances` / `RMR_INSTANCES` | 1 | run N (1–10) independent slots, each its own connector URL and its own selected Revit |
 | `--deny-tools` / `RMR_DENY_TOOLS` | none | comma list of tools hidden from remote clients (e.g. code execution) |
+| `--no-exec` / `RMR_NO_EXEC` | off | hide the arbitrary-code tools (`execute_revit_code`, `revit_run_on_documents`) so proprietary code is never sent over the connector |
+| `--no-log` / `RMR_NO_LOG` | off | no request/access logging from the remote layer (connector URL is still printed) |
+| `--state-dir` / `RMR_STATE_DIR` | `%LOCALAPPDATA%\RevitMcpRemote` | folder for the passphrase/token store (point it at your user profile only) |
 | `RMR_EXTRA_REDIRECTS` | none | extra OAuth redirect URI prefixes (Claude web + loopback are built in) |
-| `RMR_STATE_DIR` | `%LOCALAPPDATA%\RevitMcpRemote` | passphrase hash, clients, hashed tokens |
 | `RMR_TUNNEL_PROTOCOL` | quic | tunnel transport: `quic` (lowest latency, auto-falls back to http2), `http2`, or `auto` |
 | `RMR_KEEPALIVE` | 90 | seconds the edge↔server connection is held open between calls |
 | `RMR_TUNNEL_KEEPALIVE` / `RMR_TUNNEL_KEEPALIVE_TIMEOUT` | 8 / 90s | cloudflared origin keep-alive pool size / idle timeout |
@@ -97,6 +99,13 @@ Claude Code (header auth, no browser sign-in):
   behind Cloudflare Access if your IT requires SSO in front of it.
 - **Security model.** Anyone who can type your passphrase on the sign-in page can drive Revit on this PC, including any
   code-execution tool the extension provides. Use a long passphrase; 5 wrong attempts lock sign-in for 15 minutes.
+- **Privacy / keeping your IP yours.** The connection is TLS 1.3 end to end, so the *content* of your calls isn't readable
+  on the network; only the destination is visible as metadata (a VPN hides that too on untrusted Wi-Fi). What TLS can't
+  change is that code runs on whatever PC Revit is on. To keep proprietary logic off a machine you don't own: run with
+  `--no-exec` (no code strings cross the connector), keep your proprietary routines as pyRevit extensions on your own
+  laptop, and drive remote Revit only through the structured tools. On a managed/Work PC see **WORK_PC_SETUP.md** for the
+  full hardening checklist — and note no setting hides the tool from software that manages that PC, which this project
+  does not attempt.
 
 ## Test
 

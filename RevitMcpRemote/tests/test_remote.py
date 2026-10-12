@@ -174,6 +174,24 @@ def main():
     check("11 deny-tools", names == ["revit_status"], names)
     server2.should_exit = True
 
+    # 12. --no-exec hides every arbitrary-code tool (here: execute_revit_code)
+    store3 = oauth_gate.Store()
+    base3, server3 = serve(store3, deny=list(rmr.EXEC_TOOLS))
+    names, _ = asyncio.run(mcp_session(base3, static))
+    check("12 no-exec hides exec tools", "execute_revit_code" not in names and "revit_status" in names, names)
+    server3.should_exit = True
+
+    # 13. --state-dir / RMR_STATE_DIR routes the passphrase store to the chosen folder
+    sd = tempfile.mkdtemp(prefix="rmr_sd_")
+    saved = os.environ.get("RMR_STATE_DIR")
+    try:
+        os.environ["RMR_STATE_DIR"] = sd
+        st = oauth_gate.Store()
+        check("13 state-dir routes the store", os.path.dirname(st.path) == sd, st.path)
+    finally:
+        if saved is not None:
+            os.environ["RMR_STATE_DIR"] = saved
+
     print("\nALL PASSED" if not failures else "\nFAILED: %s" % ", ".join(failures))
     return 1 if failures else 0
 

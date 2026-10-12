@@ -19,6 +19,13 @@ Usage (Windows, from this folder):
     py -3.14 revit_mcp_remote.py --tunnel quick     serve + print the connector URL
     py -3.14 revit_mcp_remote.py --check            list tools, test routing, exit
     py -3.14 revit_mcp_remote.py --revoke-all       sign every client out
+
+Privacy hardening (useful on a managed / Work PC):
+    --no-exec       hide the arbitrary-code tools (execute_revit_code, revit_run_on_documents)
+                    so proprietary code is never sent over the connector
+    --no-log        no request/access logging from the remote layer (the connector URL is
+                    still printed; the router / pyRevit keep their own logging)
+    --state-dir D   keep the passphrase/token store in D (e.g. your user profile only)
 """
 from __future__ import annotations
 
@@ -41,8 +48,14 @@ if HERE not in sys.path:
 
 import oauth_gate  # noqa: E402
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 DEFAULT_PORT = 8765
+
+# Tools that run an arbitrary code string inside Revit. --no-exec hides these from the
+# remote connector so your proprietary logic is never shipped over the wire as a payload;
+# the structured Revit tools (list/select sessions, documents, status, extension tools)
+# stay available.
+EXEC_TOOLS = ("execute_revit_code", "revit_run_on_documents")
 ROUTER_DIR_CANDIDATES = (
     os.path.join(os.path.dirname(HERE), "RevitMcpRouter"),             # Netbuild\scripts\RevitMcpRemote
     os.path.join(os.path.dirname(HERE), "scripts", "RevitMcpRouter"),  # repo root layout
@@ -53,6 +66,10 @@ ROUTER_DIR_CANDIDATES = (
 def _log(msg):
     sys.stderr.write("[revit_mcp_remote] %s\n" % msg)
     sys.stderr.flush()
+
+
+def _envflag(name):
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +247,10 @@ def run_multi(a, router_dir, n):
                "--port", str(port), "--bridge-module", a.bridge_module, "--deny-tools", a.deny_tools]
         if router_dir:
             cmd += ["--router-dir", router_dir]
+        if a.no_exec:
+            cmd += ["--no-exec"]
+        if a.no_log:
+            cmd += ["--no-log"]
         return subprocess.Popen(cmd)   # inherits env incl. shared RMR_STATE_DIR
 
     try:
@@ -276,10 +297,23 @@ def main(argv=None):
     ap.add_argument("--bridge-module", default=os.environ.get("RMR_BRIDGE_MODULE", "bridge_core"))
     ap.add_argument("--deny-tools", default=os.environ.get("RMR_DENY_TOOLS", ""),
                     help="comma list of tool names to hide from remote clients")
+    ap.add_argument("--no-exec", action="store_true",
+                    default=_envflag("RMR_NO_EXEC"),
+                    help="hide arbitrary-code tools (%s) so proprietary code is never sent "
+                         "over the connector" % ", ".join(EXEC_TOOLS))
+    ap.add_argument("--no-log", action="store_true",
+                    default=_envflag("RMR_NO_LOG"),
+                    help="no request/access logging from the remote layer (URL is still printed)")
+    ap.add_argument("--state-dir", default=os.environ.get("RMR_STATE_DIR"),
+                    help="folder for the passphrase/token store (default %%LOCALAPPDATA%%\\RevitMcpRemote)")
     ap.add_argument("--instances", type=int, default=int(os.environ.get("RMR_INSTANCES", "1")),
                     help="run N (1-10) independent servers, each its own connector URL and its own "
                          "selected Revit, so N Claude chats can each drive a different Revit at once")
     a = ap.parse_args(argv)
+
+    # --state-dir must be in place before the Store reads/writes the passphrase file.
+    if a.state_dir:
+        os.environ["RMR_STATE_DIR"] = a.state_dir
 
     store = oauth_gate.Store()
     if a.setup or a.rotate_token:
@@ -300,6 +334,8 @@ def main(argv=None):
 
     bridge = load_bridge(router_dir, a.bridge_module)
     deny = [t.strip() for t in a.deny_tools.split(",") if t.strip()]
+    if a.no_exec:
+        deny = list(dict.fromkeys(deny + list(EXEC_TOOLS)))
     mcp, ext = build_mcp(bridge, deny)
     mcp.settings.port = a.port
 
@@ -338,8 +374,11 @@ def main(argv=None):
     try:
         # timeout_keep_alive holds the edge<->origin connection open between tool calls so a
         # burst of calls in one chat reuses it instead of re-handshaking each time.
+        # --no-log silences uvicorn's access/error logging (request lines can carry the path
+        # and query), leaving the startup banner / connector URL (printed via _log) intact.
+        log_level = "critical" if a.no_log else os.environ.get("RMR_LOG_LEVEL", "warning")
         uvicorn.run(build_app(mcp, store), host="127.0.0.1", port=a.port,
-                    log_level=os.environ.get("RMR_LOG_LEVEL", "warning"),
+                    log_level=log_level, access_log=not a.no_log,
                     proxy_headers=True, forwarded_allow_ips="127.0.0.1",
                     timeout_keep_alive=int(os.environ.get("RMR_KEEPALIVE", "90")))
     finally:

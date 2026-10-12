@@ -58,11 +58,57 @@ On the Work PC:
 Then in claude.ai: Settings -> Connectors -> Add custom connector -> that URL ->
 Connect -> passphrase (and SSO if you enabled Access).
 
+## 3. Privacy hardening on a managed PC
+
+The Work PC is owned by your company, so be clear-eyed about what "private" can and
+cannot mean on it:
+
+- **On the wire:** the MCP connection is TLS 1.3 end to end, so the *content* of your
+  calls is not readable on the corporate network — same as webmail. The *destination*
+  (an outbound connection to Cloudflare) is visible as metadata, not payload.
+- **On the machine itself:** anything the company installs to manage the PC (MDM, EDR,
+  DLP, screen recording) can see processes, files on disk, and what's in memory while a
+  tool runs. That's true of **any** software you run on their hardware, including Claude
+  Code Desktop. No setting here changes that, and this tool does not try to hide itself
+  from that monitoring.
+
+What you *can* do is keep your footprint small and keep your IP off the machine:
+
+| Flag | What it does |
+|---|---|
+| `--no-exec` | Hides the arbitrary-code tools (`execute_revit_code`, `revit_run_on_documents`). Your proprietary code is then **never shipped over the connector** — only the structured Revit tools run. |
+| `--no-log` | Turns off request/access logging from the remote layer (the connector URL is still printed). |
+| `--state-dir D` | Keeps the passphrase/token store in a folder you choose (e.g. your own user profile), not a shared location. |
+
+Recommended Work-PC command:
+
+```
+py -3.14 revit_mcp_remote.py --tunnel named --tunnel-name revit-mcp ^
+  --public-url https://revit.<yourdomain> --no-exec --no-log --state-dir "%USERPROFILE%\.rmr"
+```
+
+### The real way to keep proprietary logic off the Work PC
+
+The one thing a connector can't do is un-run code: whatever executes in Revit runs on the
+PC Revit is on. So if your high-value logic must never materialize on the Work PC:
+
+1. Keep your proprietary routines as **pyRevit extensions installed on your own laptop**,
+   not on the Work PC.
+2. Run with `--no-exec` on the Work PC so no code string can be sent through the connector.
+3. Drive the Work PC's Revit only through the **generic, structured tools** (open document,
+   list/set elements and parameters, run a named command). Those carry no proprietary logic —
+   just instructions to Revit's own API.
+
+That way the Work PC runs ordinary Revit automation and your IP stays on hardware you own.
+If a model physically has to be open on the Work PC and your logic has to run *in* it, there
+is no configuration that keeps that logic off the machine — that's a property of where Revit
+runs, not of this tool.
+
 ## Notes
 
-- `--deny-tools execute_revit_code` (or any tool name) hides risky tools from the remote
-  connector if IT wants the surface reduced. Example:
-  `py -3.14 revit_mcp_remote.py --tunnel named --tunnel-name revit-mcp --public-url https://revit.<yourdomain> --deny-tools execute_revit_code`
+- `--deny-tools execute_revit_code` (or any tool name) hides individual tools from the remote
+  connector if IT wants the surface reduced further. `--no-exec` is the shortcut for the whole
+  code-execution set.
 - `--revoke-all` signs out every connected client immediately.
 - Everything else (multiple Revits, `revit_select_session`, URL behaviour) is in
   README.md / QUICKSTART.md.
