@@ -32,7 +32,7 @@ Claude (claude.ai)  --HTTPS-->  Cloudflare Tunnel  -->  127.0.0.1:8765  [OAuth g
 
 1. Same Python the router uses (`py -3.14`, with `mcp[cli]<2` and `httpx`; `uvicorn`/`starlette` come with `mcp`).
 2. Install cloudflared: `winget install --id Cloudflare.cloudflared`, or put `cloudflared.exe` in this folder.
-3. Keep this folder beside `scripts\RevitMcpRouter` (Netbuild layout), or set `RMR_ROUTER_DIR`.
+3. Keep this folder next to `RevitMcpRouter` (it is synced to `Netbuild\scripts\RevitMcpRemote`), or set `RMR_ROUTER_DIR`.
 4. `py -3.14 revit_mcp_remote.py --check` should list the tools and the routed Revit.
 
 ## Use it
@@ -65,7 +65,7 @@ Claude Code (header auth, no browser sign-in):
 | `--port` / `RMR_PORT` | 8765 | local port (loopback only) |
 | `--tunnel` / `RMR_TUNNEL` | none (cmd: quick) | `quick`, `named` or `none` (bring your own tunnel) |
 | `--public-url` / `RMR_PUBLIC_URL` | from Host header | fixed public origin for OAuth metadata |
-| `--router-dir` / `RMR_ROUTER_DIR` | `..\scripts\RevitMcpRouter`, then `C:\SK\OneDrive\Netbuild\scripts\RevitMcpRouter` | where `bridge_core.py` lives |
+| `--router-dir` / `RMR_ROUTER_DIR` | sibling `..\RevitMcpRouter`, `..\scripts\RevitMcpRouter`, then `C:\SK\OneDrive\Netbuild\scripts\RevitMcpRouter` | where `bridge_core.py` lives |
 | `--deny-tools` / `RMR_DENY_TOOLS` | none | comma list of tools hidden from remote clients (e.g. code execution) |
 | `RMR_EXTRA_REDIRECTS` | none | extra OAuth redirect URI prefixes (Claude web + loopback are built in) |
 | `RMR_STATE_DIR` | `%LOCALAPPDATA%\RevitMcpRemote` | passphrase hash, clients, hashed tokens |

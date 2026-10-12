@@ -43,7 +43,8 @@ import oauth_gate  # noqa: E402
 VERSION = "0.1.0"
 DEFAULT_PORT = 8765
 ROUTER_DIR_CANDIDATES = (
-    os.path.join(os.path.dirname(HERE), "scripts", "RevitMcpRouter"),  # repo / Netbuild layout
+    os.path.join(os.path.dirname(HERE), "RevitMcpRouter"),             # Netbuild\scripts\RevitMcpRemote
+    os.path.join(os.path.dirname(HERE), "scripts", "RevitMcpRouter"),  # repo root layout
     r"C:\SK\OneDrive\Netbuild\scripts\RevitMcpRouter",
 )
 
