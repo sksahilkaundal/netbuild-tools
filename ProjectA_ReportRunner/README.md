@@ -31,8 +31,14 @@ string, the run stops with an error rather than guessing.
    - **Python**: leave it blank to use the Python that opened the app. Otherwise point it at the
      `python.exe` that has the scripts' packages installed (PyMuPDF etc.).
 
-Optional single-file exe: run `build_exe.bat` to get `dist\ProjectA_ReportRunner.exe`. The exe opens
-without Python, but your scripts still run with the Python linked on the Setup tab.
+**Exe version (no Python needed to open it).** Download `ProjectA_ReportRunner-windows` from the
+repo's **Actions → Build ProjectA Report Runner (Windows exe)** run. It holds:
+- `ProjectA_ReportRunner.exe`: the window.
+- `ProjectA.exe`: the command line.
+
+You can also build both locally with `build_exe.bat`. Put the exes in any folder;
+`settings.json` and `logs\` are created next to them. Your scripts still run with the Python
+linked on the Setup tab.
 
 ## Workflow (Run tab)
 
