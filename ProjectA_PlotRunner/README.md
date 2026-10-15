@@ -72,7 +72,7 @@ set to *Stop*, the runner says so. No Python is needed for the exe.
 | Field | What to enter |
 |---|---|
 | Output folder | `YYYYMMDD` (defaults to today). The full BASE_OUTPUT_FOLDER is shown next to it |
-| Revision date | Any spelling: `06-Sep-2026`, `06/09/2026` or `2026-09-06`. **Each model's real format is read live** before the dry run, and the filter uses the spelling that model actually stores (SW00 uses DD/MM/YYYY, the Podium models DD-Mon-YYYY). Only zero-padded forms are used, because `6-Sep-2026` would also match `16-Sep-2026` |
+| Revision date | Any spelling: `06-Sep-2026`, `06/09/2026` or `2026-09-06`. **Each model's real format is read live** before exporting, and the filter uses the spelling that model actually stores (SW00 uses DD/MM/YYYY, the Podium models DD-Mon-YYYY). Only zero-padded forms are used, because `6-Sep-2026` would also match `16-Sep-2026` |
 | Export | **PDF only**, **CAD (DWG) only**, or **PDF + CAD (DWG)**. With both, all PDFs go first, then all DWGs, never interleaved per sheet |
 | Sheets | **All sheets with that revision date**, or **Only these sheets**. Type them in, use **Load .txt…**, or click **Feed sheets…** |
 
@@ -87,7 +87,7 @@ or only the last field (`210001`). The same syntax works in the box and on the c
 `210001 to 210012`, `210001..210012` or `210001-210012` (digits only).
 
 Leave the date empty to export the listed sheets whatever their revision date. If that would pick up a
-superseded duplicate (same drawing number, Sheet Number ending `(1)`), the dry run reports a FAIL and
+superseded duplicate (same drawing number, Sheet Number ending `(1)`), Export reports a FAIL and
 nothing is exported.
 
 ### Models: you open each one, then tell the runner
@@ -95,8 +95,7 @@ nothing is exported.
 | Step | Button | What happens |
 |---|---|---|
 | 1 | **Model is open – check** | Lists the open models and confirms the selected one is open (warns if it is not the active window; that is fine, calls bind by title). Nothing is switched for you |
-| 2 | **Dry run** | Reads the real "Current Revision Date" values and checks the 7 SBFX parameters and `Current Revision` (plus `Studio_03 - Browser Filter` on SW00). Then it runs the script with `DRY_RUN=True` and lists every sheet → category → filename. It flags duplicate drawing numbers, empty SBFX fields, sheets without a revision letter, `(n)` duplicates, and listed sheets that were not found |
-| 3 | **Export** | Runs a fresh dry run, then, by category: a **PDF batch** per category, verified on disk, then a **CAD batch** per category, verified on disk. After each CAD batch, the `FP_*.pat`, `*.pcp`, `*.jpg` and `*.png` files it wrote are swept |
+| 2 | **Export** | First reads the real "Current Revision Date" values and checks the 7 SBFX parameters, `Current Revision` and (on SW00) `Studio_03 - Browser Filter`. It then lists every sheet → category → filename (read-only, nothing written yet) and stops if any of these turn up: duplicate drawing numbers, listed sheets not found, or 0 sheets (with the reason why). Otherwise it exports by category: a **PDF batch** per category, verified on disk, then a **CAD batch** per category, verified on disk. After each CAD batch, the `FP_*.pat`, `*.pcp`, `*.jpg` and `*.png` files it wrote are swept |
 | — | **Next model >** | Moves to the next row. Open that model in Revit, then click **Model is open** |
 | — | **Verify output folder** | Checks the whole dated folder: file counts per category, empty or invalid files, leftover byproducts, PDF↔DWG pairs, and that every file exported this session is still there |
 | — | **Cancel** | Stops after the current call. Revit may still finish the sheet it is on |

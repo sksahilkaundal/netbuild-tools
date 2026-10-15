@@ -260,8 +260,7 @@ class App(object):
             self.buttons.append(w)
             return w
         btn("1. Model is open - check", self.do_check)
-        btn("2. Dry run (list sheets)", self.do_dry)
-        btn("3. Export", self.do_export)
+        btn("2. Export", self.do_export)
         btn("Next model >", self.do_next)
         ttk.Button(b, text="Cancel", command=self.do_cancel).pack(side="left", **PAD)
         b2 = ttk.Frame(m)
@@ -575,7 +574,7 @@ class App(object):
                             if doc else "NOT OPEN")
             self._show_checks("%s -- is it open?" % mdl["name"], res)
             if res.ok:
-                self.status.set("%s is open -- Dry run to see the sheets, or Export." % mdl["name"])
+                self.status.set("%s is open -- click Export." % mdl["name"])
         self._start("Check %s" % mdl["name"], lambda r: r.check_model(mdl), done)
 
     def _after_dry(self, mdl, res):
@@ -584,16 +583,6 @@ class App(object):
             self._set_state(mdl["name"], date=info["date_filter"] or "(none)")
         if "chosen" in info:
             self._set_state(mdl["name"], sheets=str(len(info["chosen"])))
-
-    def do_dry(self):
-        mdl, job = self._model(), self._job()
-        if not mdl or not job:
-            return
-
-        def done(res):
-            self._after_dry(mdl, res)
-            self._show_checks("%s -- dry run (nothing written)" % mdl["name"], res)
-        self._start("Dry run %s" % mdl["name"], lambda r: r.dry_run(mdl, job), done)
 
     def do_export(self, allow_unmatched=False):
         mdl, job = self._model(), self._job()
