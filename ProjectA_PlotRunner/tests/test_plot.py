@@ -237,6 +237,28 @@ class WorkflowTests(Fixture):
         self.assertFalse(res.ok)
         self.assertIn("'06/09/2026'", "\n".join(map(str, res.checks)))
 
+    def test_wrong_model_open_is_explained(self):
+        # Field case 2026-10-15: the Tower model (T00O) was open and bound as SW00; every sheet's
+        # "Studio_03 - Browser Filter" is 'Tower'/'Other', so the master script routes nothing.
+        import fake_revit as fr
+        sheets = []
+        for i in range(5):
+            p = fr.sbfx("T00O", "L%02d" % i, "3000%02d" % i, "06/09/2026", "C")
+            p["Studio_03 - Browser Filter"] = "Tower" if i else "Other"
+            sheets.append(fr.ViewSheet(5000 + i, "T-%02d" % i, "Tower GA", p))
+        self.fake.active = fr.Doc(self.fake, "ProjectC-Studio-BIM-T00O-ZZZ-BM-950001", sheets, self.fake.app)
+        self.fake.app.Documents.remove(self.fake.master)
+        self.s.model("SW00")["match"] = ["-T00O-"]
+        res = self.r.export(self.s.model("SW00"), self.job(mode="pdf+cad"))
+        self.assertFalse(res.ok)
+        self.assertEqual(self.fake.exports, [])
+        checks = dict((c.label, c) for c in res.checks)
+        self.assertIsNone(checks["Bound to model"].ok)
+        self.assertIn("expected ProjectC-Studio-BIM-SW0O-ZZZ-BM-950001", checks["Bound to model"].detail)
+        self.assertIn("'Tower' x4", checks["Why 0 sheets"].detail)
+        self.assertIn("different model", checks["Why 0 sheets"].detail)
+        self.assertIn("[runner] SW00: NOTHING EXPORTED", self.lines)
+
     def test_stalled_batch_falls_back_to_one_sheet_per_call(self):
         self.fake.delay["B001-AR-210002"] = 2.5   # longer than stall_seconds
         res = self.r.export(self.s.model("B001"), self.job())

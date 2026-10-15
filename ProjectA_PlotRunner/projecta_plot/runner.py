@@ -321,7 +321,14 @@ class Runner(object):
         if doc is None or data is None:
             raise Aborted("Probe: %s" % (reply.error or "no result"))
         res.info["doc"] = doc
-        res.add("Bound to model", True, doc["title"] + ("" if doc.get("active") else "  (not the active window)"))
+        res.info["probe"] = data
+        self.say("  bound to: %s   (title contains %s)" % (doc["title"], " / ".join(model["match"])))
+        expected = model.get("doc")
+        if expected and expected.lower() not in doc["title"].lower():
+            res.add("Bound to model", None, "%s -- expected %s. Is the right model open? (match text on "
+                    "Setup > Models)" % (doc["title"], expected))
+        else:
+            res.add("Bound to model", True, doc["title"] + ("" if doc.get("active") else "  (not the active window)"))
         dates = data["dates"]
         top = sorted(dates.items(), key=lambda kv: -kv[1])[:8]
         self.say("  %d sheets; \"Current Revision Date\" values: %s" % (
@@ -346,6 +353,9 @@ class Runner(object):
         if not job.date_text:
             res.add("Revision-date filter", None, "none -- the sheet list alone decides")
         nonce = revit.new_nonce()
+        self.say("[runner] %s: listing the sheets to export -- a dry run, nothing is written in this step "
+                 "(the script prints 'DRY_RUN is True' here; the export calls that follow run with "
+                 "DRY_RUN = False)" % model["name"])
         code = self.build_code(model, {"BASE_OUTPUT_FOLDER": job.out_dir, "REVISION_DATE_FILTER": flt,
                                        "EXPORT_PDF": "PDF" in job.kinds, "EXPORT_CAD": "CAD" in job.kinds,
                                        "DRY_RUN": True}, nonce)
@@ -360,6 +370,8 @@ class Runner(object):
         res.info.update({"date_filter": flt, "routed": found, "chosen": chosen, "unmatched": unmatched})
 
         res.add("Sheets matched by the script", bool(found), "%d (date %r)" % (len(found), flt))
+        if not found:
+            res.add("Why 0 sheets", False, self._why_none(model, res.info.get("probe"), flt))
         if job.selectors:
             res.add("Sheets you listed", not unmatched,
                     "%d sheet(s) selected%s" % (len(chosen), ("; NOT found among routed sheets%s: %s" % (
@@ -388,6 +400,29 @@ class Runner(object):
             self.say("  %-22s %-42s %s" % (c["sheet"], c["subfolder"], c["fname"]))
         return chosen
 
+    def _why_none(self, model, probe, flt):
+        """Plain-language reason the script routed no sheet, from what the probe read."""
+        if model["kind"] == "master" and probe and probe.get("groups") is not None:
+            _, src = self._script(model)
+            routes = top_level_values(src, ["SUBFOLDER_BY_BROWSER_FILTER", "BROWSER_FILTER_PARAM"])
+            keys = list((routes.get("SUBFOLDER_BY_BROWSER_FILTER") or {}).keys())
+            have = probe["groups"]
+            if not any(k in have for k in keys):
+                return ("no sheet in this model has %s = %s; it has %s. This looks like a different model "
+                        "-- open the %s master (%s) and check again" % (
+                            routes.get("BROWSER_FILTER_PARAM"), " / ".join(repr(k) for k in keys),
+                            ", ".join("%r x%d" % kv for kv in sorted(have.items(), key=lambda kv: -kv[1])),
+                            model["name"], model.get("doc") or " / ".join(model["match"])))
+            return ("sheets with %s exist, but none has the date %r, or they are excluded by Sheet Name"
+                    % (" / ".join(repr(k) for k in keys if k in have), flt))
+        return ("no sheet%s has a FloorPlan / Elevation / Section view placed -- is the right model open?"
+                % ((" with date %r" % flt) if flt else ""))
+
+    def _say_failures(self, res):
+        for c in res.checks:
+            if c.ok is not True:
+                self.say("  %s" % c)
+
     def dry_run(self, model, job):
         res = self._begin("dryrun", model)
         try:
@@ -395,6 +430,7 @@ class Runner(object):
         except Aborted as e:
             res.add("Stopped", False, str(e))
             res.aborted = True
+        self._say_failures(res)
         return self._end(res)
 
     # ---- step: export
@@ -407,7 +443,7 @@ class Runner(object):
             if res.info["unmatched"] and not allow_unmatched:
                 raise Aborted("some listed sheets were not found -- fix the list, or allow exporting the rest")
             if not chosen:
-                raise Aborted("nothing to export")
+                raise Aborted("nothing to export" + (" -- see 'Why 0 sheets'" if not res.info["routed"] else ""))
             if not all(c.ok is not False for c in res.checks if c.label != "Sheets you listed"):
                 raise Aborted("fix the FAIL lines above first")
             only = [c["sheet"] for c in chosen] if job.selectors else None
@@ -433,6 +469,9 @@ class Runner(object):
             if r["status"] != "OK":
                 res.add("%s %s" % (r["kind"], r["fname"]), False, r["status"])
         res.info["summary_csv"] = self._write_summary(model, rows)
+        self._say_failures(res)
+        if not rows:
+            self.say("[runner] %s: NOTHING EXPORTED" % model["name"])
         return self._end(res)
 
     def _overrides(self, base, kind):

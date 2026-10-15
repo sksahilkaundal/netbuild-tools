@@ -263,8 +263,8 @@ class App(object):
         for tag, colour in (("ok", "#1b7f2a"), ("warn", "#b26a00"), ("fail", "#c62828"), ("head", "#000")):
             self.checks.tag_config(tag, foreground=colour)
         self.checks.tag_config("head", font=("Segoe UI", 9, "bold"))
-        lf = ttk.LabelFrame(pw, text="Revit / runner output")
-        self.out = ScrolledText(lf, height=14, wrap="none", font=("Consolas", 9))
+        lf = ttk.LabelFrame(pw, text="Revit / runner output  (read-only log -- set options above, not here)")
+        self.out = ScrolledText(lf, height=14, wrap="none", font=("Consolas", 9), state="disabled")
         self.out.pack(fill="both", expand=True)
         pw.add(cf, weight=1)
         pw.add(lf, weight=3)
@@ -476,8 +476,7 @@ class App(object):
         for w in self.buttons:
             w.state(["disabled"])
         self.status.set("Running: %s ..." % label)
-        self.out.insert("end", "\n===== %s  %s =====\n" % (label, time.strftime("%H:%M:%S")))
-        self.out.see("end")
+        self._log("\n===== %s  %s =====" % (label, time.strftime("%H:%M:%S")))
         runner = Runner(self.s, on_line=lambda line: self.q.put(("line", line)), cancel=self.cancel)
 
         def work():
@@ -493,8 +492,7 @@ class App(object):
             while True:
                 kind, payload = self.q.get_nowait()
                 if kind == "line":
-                    self.out.insert("end", payload + "\n")
-                    self.out.see("end")
+                    self._log(payload)
                 else:
                     done, res, err = payload
                     self.busy = False
@@ -509,6 +507,12 @@ class App(object):
         except queue.Empty:
             pass
         self.root.after(100, self._poll)
+
+    def _log(self, text):
+        self.out.config(state="normal")
+        self.out.insert("end", text + "\n")
+        self.out.config(state="disabled")
+        self.out.see("end")
 
     def _show_checks(self, title, res, clear=True):
         self.checks.config(state="normal")
