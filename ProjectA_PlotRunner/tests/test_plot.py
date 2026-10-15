@@ -37,12 +37,22 @@ def sha(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
+SCRIPT_HASHES = None
+
+
+def before_after_scripts_unchanged():
+    return SCRIPT_HASHES == (sha(MASTER), sha(PODIUM))
+
+
 def tree(root):
     out = set()
     for d, _, files in os.walk(root):
         for f in files:
             out.add(os.path.relpath(os.path.join(d, f), root).replace(os.sep, "/"))
     return out
+
+
+SCRIPT_HASHES = (sha(MASTER), sha(PODIUM))
 
 
 class PatchTests(unittest.TestCase):
@@ -238,17 +248,9 @@ class WorkflowTests(Fixture):
         self.assertIn("'06/09/2026'", "\n".join(map(str, res.checks)))
 
     def test_wrong_model_open_is_explained(self):
-        # Field case 2026-10-15: the Tower model (T00O) was open and bound as SW00; every sheet's
+        # Field case 2026-10-15: the Tower plans model (T00O) was bound as SW00; every sheet's
         # "Studio_03 - Browser Filter" is 'Tower'/'Other', so the master script routes nothing.
-        import fake_revit as fr
-        sheets = []
-        for i in range(5):
-            p = fr.sbfx("T00O", "L%02d" % i, "3000%02d" % i, "06/09/2026", "C")
-            p["Studio_03 - Browser Filter"] = "Tower" if i else "Other"
-            sheets.append(fr.ViewSheet(5000 + i, "T-%02d" % i, "Tower GA", p))
-        self.fake.active = fr.Doc(self.fake, "ProjectC-Studio-BIM-T00O-ZZZ-BM-950001", sheets, self.fake.app)
-        self.fake.app.Documents.remove(self.fake.master)
-        self.s.model("SW00")["match"] = ["-T00O-"]
+        self.s.model("SW00")["match"] = ["T00O-ZZZ-BM-950001"]
         res = self.r.export(self.s.model("SW00"), self.job(mode="pdf+cad"))
         self.assertFalse(res.ok)
         self.assertEqual(self.fake.exports, [])
@@ -258,6 +260,46 @@ class WorkflowTests(Fixture):
         self.assertIn("'Tower' x4", checks["Why 0 sheets"].detail)
         self.assertIn("different model", checks["Why 0 sheets"].detail)
         self.assertIn("[runner] SW00: NOTHING EXPORTED", self.lines)
+
+    def test_master_and_areas_models_do_not_collide(self):
+        # SW0O-...-BM-950001 (master) and SW00-...-AR-970002 (Areas) are open together
+        self.assertTrue(self.r.check_model(self.s.model("SW00")).ok)
+        self.assertTrue(self.r.check_model(self.s.model("AREAS")).ok)
+        self.assertTrue(self.r.check_model(self.s.model("TOWER-PLANS")).ok)
+        self.assertTrue(self.r.check_model(self.s.model("TOWER-ELEV-SEC")).ok)
+
+    def test_tower_and_areas_models(self):
+        res = self.r.export(self.s.model("TOWER-PLANS"), self.job(mode="pdf+cad"))
+        self.assertTrue(res.ok, self.explain(res))
+        res = self.r.export(self.s.model("TOWER-ELEV-SEC"), self.job(mode="pdf"))
+        self.assertTrue(res.ok, self.explain(res))
+        res = self.r.export(self.s.model("AREAS"), self.job(date="06/09/2026", mode="pdf", sheets="600001 to 600002"))
+        self.assertTrue(res.ok, self.explain(res))
+        self.assertEqual(tree(self.out), {
+            "PDF/06_Tower Plans/ProjectC-Studio-DWG-T00O-L10-AR-400001_B.pdf",
+            "PDF/06_Tower Plans/ProjectC-Studio-DWG-T00O-L11-AR-400002_B.pdf",
+            "PDF/06_Tower Plans/ProjectC-Studio-DWG-T00O-L12-AR-400003_B.pdf",
+            "CAD/06_Tower Plans/ProjectC-Studio-DWG-T00O-L10-AR-400001_B.dwg",
+            "CAD/06_Tower Plans/ProjectC-Studio-DWG-T00O-L11-AR-400002_B.dwg",
+            "CAD/06_Tower Plans/ProjectC-Studio-DWG-T00O-L12-AR-400003_B.dwg",
+            "PDF/07_Tower Elevations/ProjectC-Studio-DWG-T00O-ZZZ-AR-500001_B.pdf",
+            "PDF/07_Tower Elevations/ProjectC-Studio-DWG-T00O-ZZZ-AR-500002_B.pdf",
+            "PDF/08_Tower Sections/ProjectC-Studio-DWG-T00O-ZZZ-AR-500003_B.pdf",
+            "PDF/08_Tower Sections/ProjectC-Studio-DWG-T00O-ZZZ-AR-500004_B.pdf",
+            "PDF/09_Area Plans/ProjectC-Studio-DWG-SW00-L00-AR-600001_A.pdf",
+            "PDF/09_Area Plans/ProjectC-Studio-DWG-SW00-L01-AR-600002_A.pdf",
+        })  # Tower CeilingPlan + Legend sheets are not routed
+        self.assertEqual(before_after_scripts_unchanged(), True)
+
+    def test_old_settings_get_the_new_model_list(self):
+        import json
+        with open(self.s.path, "w") as f:
+            json.dump({"plot_root": self.plot, "models": [{"name": "SW00", "kind": "master",
+                                                           "match": ["-T00O-"]}]}, f)
+        s2 = Settings(self.app)
+        self.assertEqual([m["name"] for m in s2["models"]][-3:], ["TOWER-PLANS", "TOWER-ELEV-SEC", "AREAS"])
+        self.assertEqual(s2.model("SW00")["match"][0], "SW0O-ZZZ-BM-950001")
+        self.assertEqual(s2["plot_root"], self.plot)
 
     def test_stalled_batch_falls_back_to_one_sheet_per_call(self):
         self.fake.delay["B001-AR-210002"] = 2.5   # longer than stall_seconds

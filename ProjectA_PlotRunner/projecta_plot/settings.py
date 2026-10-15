@@ -12,21 +12,29 @@ DEFAULTS = {
     "plot_root": r"C:\Users\user\OneDrive - Studio\Projects\ProjectA\Plot",
     # pyRevit MCP listener (same route the execute_revit_code MCP tool uses)
     "revit_url": "http://127.0.0.1:48884/revit_mcp/execute_code/",
-    # Models in run order. `match`: any of these substrings in the Revit document
-    # title binds the call to that model (a local file's title carries a _username suffix).
+    # Models in run order. `match`: any of these texts in the Revit document title binds the call
+    # to that model (a local file's title carries a _username suffix). Full document numbers, so
+    # SW0O-...-BM-950001 (master) and SW00-...-AR-970002 (Areas) never collide.
+    # `kind`: master = the browser-filter script; podium = the view-type script. `subfolders`
+    # replaces that script's SUBFOLDER_BY_VIEWTYPE for this model only (placed view type -> folder).
+    "models_version": 2,
     "models": [
-        {"name": "SW00", "kind": "master", "match": ["-SW0O-", "-SW00-"],
+        {"name": "SW00", "kind": "master", "match": ["SW0O-ZZZ-BM-950001", "SW00-ZZZ-BM-950001"],
          "doc": "ProjectC-Studio-BIM-SW0O-ZZZ-BM-950001"},
-        {"name": "B001", "kind": "podium", "match": ["-B001-"],
-         "doc": "ProjectC-Studio-BIM-B001-ZZZ-BM-950001"},
-        {"name": "B002", "kind": "podium", "match": ["-B002-"],
-         "doc": "ProjectC-Studio-BIM-B002-ZZZ-BM-950001"},
-        {"name": "B003", "kind": "podium", "match": ["-B003-"],
-         "doc": "ProjectC-Studio-BIM-B003-ZZZ-BM-950001"},
-        {"name": "B004", "kind": "podium", "match": ["-B004-"],
-         "doc": "ProjectC-Studio-BIM-B004-ZZZ-BM-950001"},
-        {"name": "B005", "kind": "podium", "match": ["-B005-"],
-         "doc": "ProjectC-Studio-BIM-B005-ZZZ-BM-950001"},
+        {"name": "B001", "kind": "podium", "match": ["-B001-"], "doc": "ProjectC-Studio-BIM-B001-ZZZ-BM-950001"},
+        {"name": "B002", "kind": "podium", "match": ["-B002-"], "doc": "ProjectC-Studio-BIM-B002-ZZZ-BM-950001"},
+        {"name": "B003", "kind": "podium", "match": ["-B003-"], "doc": "ProjectC-Studio-BIM-B003-ZZZ-BM-950001"},
+        {"name": "B004", "kind": "podium", "match": ["-B004-"], "doc": "ProjectC-Studio-BIM-B004-ZZZ-BM-950001"},
+        {"name": "B005", "kind": "podium", "match": ["-B005-"], "doc": "ProjectC-Studio-BIM-B005-ZZZ-BM-950001"},
+        {"name": "TOWER-PLANS", "kind": "podium", "match": ["T00O-ZZZ-BM-950001", "T000-ZZZ-BM-950001"],
+         "doc": "ProjectC-Studio-BIM-T00O-ZZZ-BM-950001",
+         "subfolders": {"FloorPlan": "06_Tower Plans"}},
+        {"name": "TOWER-ELEV-SEC", "kind": "podium", "match": ["T00O-ZZZ-BM-950002", "T000-ZZZ-BM-950002"],
+         "doc": "ProjectC-Studio-BIM-T00O-ZZZ-BM-950002",
+         "subfolders": {"Elevation": "07_Tower Elevations", "Section": "08_Tower Sections"}},
+        {"name": "AREAS", "kind": "podium", "match": ["SW00-ZZZ-AR-970002", "SW0O-ZZZ-AR-970002"],
+         "doc": "ProjectC-Studio-BIM-SW00-ZZZ-AR-970002",
+         "subfolders": {"AreaPlan": "09_Area Plans", "FloorPlan": "09_Area Plans"}},
     ],
     # Watching the disk while Revit exports
     "poll_seconds": 3,
@@ -77,7 +85,12 @@ class Settings(dict):
         self.folder = folder or app_dir()
         self.path = os.path.join(self.folder, "settings.json")
         merged = json.loads(json.dumps(DEFAULTS))
-        merged.update(_read_json(self.path))
+        saved = _read_json(self.path)
+        if saved.get("models_version", 1) < DEFAULTS["models_version"]:
+            # an older model list (before Tower/Areas, short match texts) -> today's defaults
+            saved.pop("models", None)
+            saved.pop("models_version", None)
+        merged.update(saved)
         super().__init__(merged)
 
     def save(self):

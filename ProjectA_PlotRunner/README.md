@@ -7,6 +7,18 @@ existing export scripts:
 |---|---|---|
 | `scripts\export_master_ga_sheets_by_browser_filter.py` | SW00 master (`ProjectC-Studio-BIM-SW0O-ZZZ-BM-950001`) | `Studio_03 - Browser Filter`: `B2 B5_1-200` → `02_GA Plans B2 B5 (1-200)`, `Site` → `01_GA Plans (1-500) - Site` (except Solar Shading 01/02 and Site Plan) |
 | `scripts\export_podium_sheets_by_revision.py` | Podium B001–B005 | placed view type: FloorPlan → `03_…Part Plans`, Elevation → `04_…Elevations`, Section → `05_…Sections` |
+| same Podium script, own folders | TOWER-PLANS (`ProjectC-Studio-BIM-T00O-ZZZ-BM-950001`) | FloorPlan → `06_Tower Plans` |
+| same Podium script, own folders | TOWER-ELEV-SEC (`ProjectC-Studio-BIM-T00O-ZZZ-BM-950002`) | Elevation → `07_Tower Elevations`, Section → `08_Tower Sections` |
+| same Podium script, own folders | AREAS (`ProjectC-Studio-BIM-SW00-ZZZ-AR-970002`) | AreaPlan / FloorPlan → `09_Area Plans` |
+
+For Tower and Areas, the runner replaces the Podium script's `SUBFOLDER_BY_VIEWTYPE` in memory for that
+model only. The script file is not changed. You can edit the folder names on **Setup → Models**
+(`view type = folder; …`).
+
+Models are bound by their **full document number**. This matters because the master is
+`SW0O-…-BM-950001` and Areas is `SW00-…-AR-970002`, and a short match like `SW00` would hit both.
+A `settings.json` saved by an older build has its model list replaced by the new defaults when it is
+first opened. Paths and all other settings are kept.
 
 Output: `BASE_OUTPUT_FOLDER = <Plot root>\<YYYYMMDD>\PDF|CAD\<category>\<SBFX 01-07>_<Current Revision>.pdf|.dwg`.
 A0, Center placement, 100 % (set in the scripts; Setup checks they still say so).

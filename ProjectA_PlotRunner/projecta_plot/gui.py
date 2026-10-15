@@ -22,9 +22,27 @@ SETUP_FIELDS = [("netbuild_root", "Netbuild folder", "dir")] + \
     ("time_saved_log", "Time-saved log (.csv)", "save"),
     ("revit_url", "Revit listener URL", "text"),
 ]
-COLUMNS = [("model", "Model", 70), ("script", "Script", 70), ("open", "Open in Revit", 300),
+COLUMNS = [("model", "Model", 110), ("script", "Routing", 90), ("open", "Open in Revit", 300),
            ("date", "Date filter", 100), ("sheets", "Sheets", 70), ("pdf", "PDF", 70),
            ("dwg", "DWG", 70), ("result", "Result", 160)]
+
+
+def routing(mdl):
+    return "browser filter" if mdl["kind"] == "master" else "view type"
+
+
+def format_folders(mapping):
+    return "; ".join("%s = %s" % kv for kv in (mapping or {}).items())
+
+
+def parse_folders(text):
+    """'FloorPlan = 06_Tower Plans; AreaPlan = 09_Area Plans' -> dict (bad pieces ignored)."""
+    out = {}
+    for piece in (text or "").split(";"):
+        key, sep, folder = piece.partition("=")
+        if sep and key.strip() and folder.strip():
+            out[key.strip()] = folder.strip()
+    return out
 
 
 class SheetDialog(object):
@@ -224,7 +242,7 @@ class App(object):
 
         m = ttk.LabelFrame(self.run_tab, text="Models -- open each in Revit, then tell the runner it is open")
         m.pack(fill="x", **PAD)
-        self.tree = ttk.Treeview(m, columns=[c[0] for c in COLUMNS], show="headings", height=6,
+        self.tree = ttk.Treeview(m, columns=[c[0] for c in COLUMNS], show="headings", height=9,
                                  selectmode="browse")
         for key, label, width in COLUMNS:
             self.tree.heading(key, text=label)
@@ -273,7 +291,7 @@ class App(object):
         self.tree.delete(*self.tree.get_children())
         for mdl in self.s["models"]:
             st = self.state.setdefault(mdl["name"], {})
-            vals = [mdl["name"], mdl["kind"]] + [st.get(k, "") for k, _, _ in COLUMNS[2:]]
+            vals = [mdl["name"], routing(mdl)] + [st.get(k, "") for k, _, _ in COLUMNS[2:]]
             self.tree.insert("", "end", iid=mdl["name"], values=vals)
         kids = self.tree.get_children()
         if kids:
@@ -308,17 +326,25 @@ class App(object):
             self.path_marks[key] = mark
             var.trace_add("write", lambda *a: self._check_paths())
 
-        o = ttk.LabelFrame(self.setup_tab, text="Models (Revit title must contain one of the match texts; "
-                                                "comma-separated)")
+        o = ttk.LabelFrame(self.setup_tab, text="Models -- Revit title must contain one of the match texts "
+                                                "(comma-separated); folders: view type = folder; ...")
         o.pack(fill="x", **PAD)
         o.columnconfigure(2, weight=1)
-        self.match_vars = {}
-        for i, mdl in enumerate(self.s["models"]):
+        o.columnconfigure(3, weight=1)
+        self.match_vars, self.folder_vars = {}, {}
+        ttk.Label(o, text="Match text", foreground="#555").grid(row=0, column=2, sticky="w", **PAD)
+        ttk.Label(o, text="Output folders (blank = the script's own)", foreground="#555").grid(
+            row=0, column=3, sticky="w", **PAD)
+        for i, mdl in enumerate(self.s["models"], 1):
             ttk.Label(o, text=mdl["name"]).grid(row=i, column=0, sticky="w", **PAD)
-            ttk.Label(o, text=mdl["kind"], foreground="#555").grid(row=i, column=1, sticky="w", **PAD)
+            ttk.Label(o, text=routing(mdl), foreground="#555").grid(row=i, column=1, sticky="w", **PAD)
             v = tk.StringVar(value=", ".join(mdl["match"]))
             self.match_vars[mdl["name"]] = v
             ttk.Entry(o, textvariable=v).grid(row=i, column=2, sticky="ew", **PAD)
+            if mdl["kind"] != "master":
+                f = tk.StringVar(value=format_folders(mdl.get("subfolders")))
+                self.folder_vars[mdl["name"]] = f
+                ttk.Entry(o, textvariable=f).grid(row=i, column=3, sticky="ew", **PAD)
 
         t = ttk.LabelFrame(self.setup_tab, text="Timing")
         t.pack(fill="x", **PAD)
@@ -370,6 +396,13 @@ class App(object):
             v = self.match_vars.get(mdl["name"])
             if v:
                 mdl["match"] = [x.strip() for x in v.get().split(",") if x.strip()] or mdl["match"]
+            f = self.folder_vars.get(mdl["name"])
+            if f:
+                folders = parse_folders(f.get())
+                if folders:
+                    mdl["subfolders"] = folders
+                else:
+                    mdl.pop("subfolders", None)
         for key, v in self.num_vars.items():
             try:
                 self.s[key] = float(v.get())

@@ -210,6 +210,27 @@ class FakeRevit(object):
                        ["FloorPlan"]))
         b.append(sheet("B001-AR-900001", "Cover", sbfx("B001", "ZZZ", "900001", "06-Sep-2026", "D"), ["Legend"]))
         self.b001 = Doc(self, "ProjectC-Studio-BIM-B001-ZZZ-BM-950001_user", b, self.app)
+
+        # Tower plans (T00O BM-950001): every sheet's browser filter is 'Tower'; FloorPlan sheets
+        t = []
+        for i, (vts, bf) in enumerate([(["FloorPlan"], "Tower")] * 3 + [(["CeilingPlan"], "Tower"),
+                                                                      (["Legend"], "Other")]):
+            p = sbfx("T00O", "L%02d" % (i + 10), "4000%02d" % (i + 1), "06/09/2026", "B")
+            p["Studio_03 - Browser Filter"] = bf
+            t.append(sheet("T-P%02d" % (i + 1), "Tower Plan %d" % i, p, vts))
+        self.tower_plans = Doc(self, "ProjectC-Studio-BIM-T00O-ZZZ-BM-950001_user", t, self.app)
+        # Tower elevations + sections (T00O BM-950002)
+        e = []
+        for i, vts in enumerate([["Legend", "Elevation"], ["Elevation"], ["Section"], ["Section"]]):
+            e.append(sheet("T-E%02d" % (i + 1), "Tower %s %d" % (vts[-1], i),
+                           sbfx("T00O", "ZZZ", "5000%02d" % (i + 1), "06/09/2026", "B"), vts))
+        self.tower_elev = Doc(self, "ProjectC-Studio-BIM-T00O-ZZZ-BM-950002_user", e, self.app)
+        # Areas (SW00 AR-970002 -- note SW00 with zeros, unlike the SW0O master)
+        a = []
+        for i, vts in enumerate([["AreaPlan"], ["Legend", "AreaPlan"], ["AreaPlan"]]):
+            a.append(sheet("A-%02d" % (i + 1), "Area Plan %d" % i,
+                           sbfx("SW00", "L%02d" % i, "6000%02d" % (i + 1), "06-Sep-2026", "A"), vts))
+        self.areas = Doc(self, "ProjectC-Studio-BIM-SW00-ZZZ-AR-970002_user", a, self.app)
         self.active = self.master
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())

@@ -266,6 +266,8 @@ class Runner(object):
         path, src = self._script(model)
         ov = dict(overrides)
         ov["doc"] = Expr("_projecta_pick_doc(_ProjectA_MATCH)")
+        if model.get("subfolders"):
+            ov["SUBFOLDER_BY_VIEWTYPE"] = dict(model["subfolders"])
         try:
             code, _ = patch_source(src, ov, insert_after_loop=revit.FILTER_LINE,
                                    prepend=revit.preamble(nonce, model["match"], subfolder, sheets),
@@ -415,8 +417,13 @@ class Runner(object):
                             model["name"], model.get("doc") or " / ".join(model["match"])))
             return ("sheets with %s exist, but none has the date %r, or they are excluded by Sheet Name"
                     % (" / ".join(repr(k) for k in keys if k in have), flt))
-        return ("no sheet%s has a FloorPlan / Elevation / Section view placed -- is the right model open?"
-                % ((" with date %r" % flt) if flt else ""))
+        if model.get("subfolders"):
+            vts = list(model["subfolders"])
+        else:
+            _, src = self._script(model)
+            vts = list((top_level_values(src, ["SUBFOLDER_BY_VIEWTYPE"]).get("SUBFOLDER_BY_VIEWTYPE") or {}))
+        return ("no sheet%s has a %s view placed -- is the right model open?"
+                % ((" with date %r" % flt) if flt else "", " / ".join(vts)))
 
     def _say_failures(self, res):
         for c in res.checks:
