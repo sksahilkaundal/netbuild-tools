@@ -1,6 +1,16 @@
 # Netbuild -- conventions for every plugin / tool in this repository
 
-Publisher: **SKAEC.COM** (https://skaec.com). Brand: **Netbuild**. License: MIT (root `LICENSE`).
+Publisher: **SKAEC.COM** (https://skaec.com). Brand: **Netbuild**.
+
+## Licensing
+- **Free tools** (e.g. Level Shift, Plot Runner): **MIT** -- the root `LICENSE`, "Copyright (c) 2026 SKAEC.COM".
+- **Paid products** sold with licence keys (Revit MCP Router, Remote Router, Revit Status): **proprietary**.
+  Each ships its own `LICENSE.txt` licence agreement ("Copyright (c) 2026 SKAEC.COM. All rights
+  reserved."); the About screen shows it together with the licence-key status. The root MIT `LICENSE`
+  does not apply to them.
+- Never change anything existing licence keys depend on (salts, secrets, key formats, Machine ID,
+  product codes in the "Netbuild Licensing" sheet, licence/activation file names and folders) as part of
+  branding or renaming -- split a display name from an identifier instead.
 
 ## Naming
 - Every product is named **"<Tool> by Netbuild"** -- e.g. *Level Shift by Netbuild*. Use that exact
@@ -14,9 +24,10 @@ Publisher: **SKAEC.COM** (https://skaec.com). Brand: **Netbuild**. License: MIT 
 
 ## About (required in every product)
 Each product has one `about.py` (see `LevelShifter/level_shift/about.py`) that is the single source for:
-`PRODUCT`, `VERSION`, `PUBLISHER = "SKAEC.COM"`, `WEBSITE`, `COPYRIGHT` ("(c) <year> SKAEC.COM",
-written as `u"© ..."` so IronPython reads it), `DESCRIPTION`, `FEATURES`, `REQUIREMENTS`,
-`LICENSE_NAME`, `LICENSE_TEXT` (== root `LICENSE`, enforced by a test), `title()`, `about_text()`.
+`PRODUCT`, `VERSION`, `PUBLISHER = "SKAEC.COM"`, `WEBSITE`, `COPYRIGHT` ("(c) <year> SKAEC.COM"; paid products add ". All rights reserved.",
+written as `u"\u00a9 ..."` -- the escape, not the character -- so IronPython reads it), `DESCRIPTION`, `FEATURES`, `REQUIREMENTS`,
+`LICENSE_NAME`, `LICENSE_TEXT` (== the product's licence file -- root `LICENSE` or its own `LICENSE.txt` --
+enforced by a test), `title()`, `about_text()`.
 It must be shown by:
 - an **About** tab / button in the product's window;
 - `<cli> about` and `<cli> --version` on the command line;
