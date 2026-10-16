@@ -4,7 +4,7 @@ import json
 import os
 import sys
 
-MAX_LEVELS = 10
+from .core import ENGINE_DEFAULTS
 
 DEFAULTS = {
     # pyRevit MCP listener (same route the execute_revit_code MCP tool and the ProjectA Plot Runner use)
@@ -12,16 +12,10 @@ DEFAULTS = {
     # Revit document title must contain this text (comma-separated alternatives); blank = active model
     "model_match": "",
     "units": "mm",                  # mm | m -- what you type and what is shown
-    # An element counts as "kept its position" when its bounding box min Z and max Z each moved
-    # less than this.
-    "tolerance_mm": 1.0,
-    "correction_rounds": 4,         # measure -> correct rounds after the level move
-    "move_fallback": True,          # an element with no offset parameter is moved back by (0, 0, -dz)
-    "rollback_on_drift": True,      # Apply: if any element still moved, undo everything
     "probe_timeout_seconds": 300,
     "apply_timeout_seconds": 3600,
-    "max_rows": 20000,              # element rows written to the CSV per run
 }
+DEFAULTS.update(ENGINE_DEFAULTS)    # tolerance_mm, correction_rounds, move_fallback, rollback_on_drift, max_rows
 
 
 def app_dir():

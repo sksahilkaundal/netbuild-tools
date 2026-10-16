@@ -33,12 +33,16 @@ jobs:
       - name: Smoke test the frozen exe
         run: python LevelShifter/tests/smoke_exe.py LevelShifter/dist/LevelShift.exe
 
-      - name: Package
+      - name: Package (exes + pyRevit extension with the exe in its bin folder)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force pkg/LevelShifter | Out-Null
+          New-Item -ItemType Directory -Force pkg/LevelShifter, pkg/pyRevit | Out-Null
           Copy-Item LevelShifter/dist/LevelShifter.exe, LevelShifter/dist/LevelShift.exe, LevelShifter/README.md pkg/LevelShifter/
-          Get-ChildItem pkg/LevelShifter | Format-Table Name, Length
+          Copy-Item -Recurse LevelShifter/pyRevit/Netbuild.extension pkg/pyRevit/
+          New-Item -ItemType Directory -Force pkg/pyRevit/Netbuild.extension/bin | Out-Null
+          Copy-Item LevelShifter/dist/LevelShifter.exe, LevelShifter/dist/LevelShift.exe pkg/pyRevit/Netbuild.extension/bin/
+          Get-ChildItem pkg -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
+          Get-ChildItem pkg -Recurse -File | Format-Table FullName, Length
 
       - uses: actions/upload-artifact@v4
         with:

@@ -3,8 +3,9 @@
 import argparse
 import sys
 
-from .runner import Aborted, MoveSpec, Runner
-from .settings import DEFAULTS, MAX_LEVELS, Settings
+from .core import MAX_LEVELS, MoveSpec
+from .runner import Aborted, Runner
+from .settings import DEFAULTS, Settings
 
 
 def _report(res):
@@ -59,7 +60,7 @@ def main(argv=None):
 
     if a.cmd in (None, "gui"):
         from .gui import main as gui_main
-        return gui_main()
+        return gui_main(["--model", a.model] if a.model else [])
 
     if a.cmd == "setup":
         for item in a.set:

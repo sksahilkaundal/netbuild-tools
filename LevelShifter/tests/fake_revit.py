@@ -124,6 +124,8 @@ class Parameter(object):
     def Set(self, value):
         if self.IsReadOnly:
             raise Exception("parameter %s is read-only" % self.key)
+        if self.el.doc.group_locked and self.el.GroupId.Value > 0:
+            raise Exception("The element belongs to a group; edit the group to change it")
         self.el.doc.touch(self.el)
         self.el.p[self.key][1] = value.Value if isinstance(value, ElementId) else value
         return True
@@ -218,7 +220,65 @@ class FamilyInstance(Element):
         self.MEPModel = MEPModel(self, mep_run) if mep_run is not None else None
 
 
+class GroupType(ElementType):
+    pass
+
+
 class Group(Element):
+    """A model group instance. Its origin is GROUP_LEVEL + GROUP_OFFSET_FROM_LEVEL; its members keep
+    their own level constraints (as in Revit); its bounding box is the members' union."""
+
+    def __init__(self, doc, gtype, level, offset, members):
+        super().__init__(doc, "OST_IOSModelGroups", gtype.Name, {"GROUP_LEVEL": level,
+                                                                 "GROUP_OFFSET_FROM_LEVEL": float(offset)},
+                         level=level, zfn=lambda g: g.union())
+        self.type_id = gtype.Id
+        self.members = [m.Id for m in members]
+        for slot, m in enumerate(members):
+            m.GroupId, m.slot = self.Id, slot
+
+    def origin(self):
+        return self.lvl("GROUP_LEVEL") + self.v("GROUP_OFFSET_FROM_LEVEL")
+
+    def member_els(self):
+        return [self.doc.by_id[i.Value] for i in self.members if i.Value in self.doc.by_id]
+
+    def union(self):
+        zs = [m.z() for m in self.member_els() if m.z()]
+        return (min(z[0] for z in zs), max(z[1] for z in zs))
+
+    def GetTypeId(self):
+        return self.type_id
+
+    @property
+    def GroupType(self):
+        return self.doc.by_id[self.type_id.Value]
+
+    def GetMemberIds(self):
+        return list(self.members)
+
+    def GetAvailableAttachedDetailGroupTypeIds(self):
+        return []
+
+    def UngroupMembers(self):
+        if self.Pinned:
+            raise Exception("The group is pinned")
+        self.doc.touch(self)
+        for m in self.member_els():
+            m.GroupId = INVALID
+        self.doc.remove(self)
+        return list(self.members)
+
+
+class CurveElement(Element):
+    pass
+
+
+class Sketch(Element):
+    pass
+
+
+class SketchPlane(Element):
     pass
 
 
@@ -259,8 +319,11 @@ class IFailuresPreprocessor(object):
 
 
 class _Failure(object):
-    def __init__(self, severity, text):
-        self.severity, self.text = severity, text
+    def __init__(self, severity, text, ids=()):
+        self.severity, self.text, self.ids = severity, text, list(ids)
+
+    def GetFailingElementIds(self):
+        return list(self.ids)
 
     def GetSeverity(self):
         return self.severity
@@ -320,6 +383,8 @@ class Transaction(object):
             if i in doc.owners:
                 fails.append(_Failure(FailureSeverity.Error, "Can't edit the element until '%s' saves changes "
                                       "to central and relinquishes it" % doc.owners[i]))
+        for text, ids in doc.group_failures():
+            fails.append(_Failure(FailureSeverity.Error, text, ids))
         for el in doc.by_id.values():
             z = el.z()
             if z and z[1] < z[0] - 1e-9:
@@ -380,14 +445,17 @@ def install_stubs():
     for name in ("BuiltInCategory", "BuiltInParameter", "CategoryType", "ElementTransformUtils",
                  "FailureProcessingResult", "FailureSeverity", "IFailuresPreprocessor", "Level",
                  "StorageType", "Transaction", "TransactionGroup", "TransactionStatus", "WorksharingUtils",
-                 "CheckoutStatus", "XYZ", "ElementId"):
+                 "CheckoutStatus", "XYZ", "ElementId", "Group", "CurveElement", "Sketch", "SketchPlane"):
         setattr(db, name, globals()[name])
     db.FilteredElementCollector = Collector
     revit_mod = types.ModuleType("Autodesk.Revit")
     revit_mod.DB = db
     autodesk = types.ModuleType("Autodesk")
     autodesk.Revit = revit_mod
-    sys.modules.update({"Autodesk": autodesk, "Autodesk.Revit": revit_mod, "Autodesk.Revit.DB": db})
+    generic = types.ModuleType("System.Collections.Generic")
+    generic.List = {ElementId: list}
+    sys.modules.update({"Autodesk": autodesk, "Autodesk.Revit": revit_mod, "Autodesk.Revit.DB": db,
+                        "System.Collections.Generic": generic})
     return db
 
 
@@ -407,6 +475,8 @@ class Doc(object):
         self.owners = {}            # element id -> user who borrowed it
         self.commit_warnings, self.commit_errors = [], []
         self.log, self.groups = [], []
+        self.group_locked = False   # True: Revit refuses parameter edits on group members
+        self.Create = types.SimpleNamespace(NewGroup=self.new_group)
         app.Documents.append(self)
 
     def new_id(self):
@@ -415,7 +485,8 @@ class Doc(object):
 
     def category(self, bic):
         if bic not in self._cats:
-            name = bic[4:].replace("_", " ")
+            name = {"OST_SketchLines": "<Sketch>", "OST_RoomSeparationLines": "<Room Separation>"}.get(
+                bic, bic[4:].replace("_", " "))
             kind = "Annotation" if bic in ("OST_TextNotes",) else "Model"
             self._cats[bic] = Category(bic, name, kind)
         return self._cats[bic]
@@ -434,16 +505,63 @@ class Doc(object):
     def Regenerate(self):
         pass
 
+    STATE = ("p", "free", "GroupId", "Name", "IsValidObject", "members", "type_id", "slot")
+
     def snapshot(self):
-        return dict((i, (copy.deepcopy(e.p), e.free)) for i, e in self.by_id.items())
+        return dict((i, (e, dict((k, copy.deepcopy(getattr(e, k))) for k in self.STATE if hasattr(e, k))))
+                    for i, e in self.by_id.items())
 
     def restore(self, snap):
-        for i, (p, free) in snap.items():
-            self.by_id[i].p, self.by_id[i].free = copy.deepcopy(p), free
+        for e in self.by_id.values():
+            if e.Id.Value not in snap:
+                e.IsValidObject = False     # created after the snapshot
+        self.by_id = dict((i, e) for i, (e, _) in snap.items())
+        for e, state in snap.values():
+            for k, v in state.items():
+                setattr(e, k, copy.deepcopy(v))
+
+    def remove(self, el):
+        el.IsValidObject = False
+        del self.by_id[el.Id.Value]
+
+    def Delete(self, eid):
+        el = self.by_id[eid.Value]
+        if isinstance(el, GroupType) and [g for g in self.by_id.values()
+                                          if isinstance(g, Group) and g.type_id == el.Id]:
+            raise Exception("group type in use")
+        self.touch(el)
+        self.remove(el)
+
+    def new_group(self, ids):
+        members = [self.by_id[i.Value] for i in ids]
+        for m in members:
+            self.touch(m)
+        gt = GroupType(self, None, "Group %d" % (len(self.by_id)), {})
+        low = min(members, key=lambda m: m.z()[0] if m.z() else 0)
+        lvl = self.by_id[low.LevelId.Value] if low.LevelId.Value > 0 else self.by_id[
+            [i for i, e in self.by_id.items() if isinstance(e, Level)][0]]
+        z0 = min(m.z()[0] for m in members if m.z())
+        return Group(self, gt, lvl, z0 - lvl.Elevation, members)
+
+    def group_failures(self):
+        """Revit's check: instances of one group type must have identical members relative to their origin."""
+        out, by_type = [], {}
+        for g in self.by_id.values():
+            if isinstance(g, Group):
+                by_type.setdefault(g.type_id.Value, []).append(g)
+        for gs in by_type.values():
+            sigs = [sorted((m.slot, round(m.z()[0] - g.origin(), 6), round(m.z()[1] - g.origin(), 6))
+                           for m in g.member_els() if m.z()) for g in gs]
+            if [x for x in sigs if x != sigs[0]]:
+                out.append(("Group instances of the same type do not contain identical members.  Press \"Fix "
+                            "Groups...\" to select from options to make the groups consistent.", [g.Id for g in gs]))
+        return out
 
     def geometry(self):
-        """{element id: (z min, z max)} for everything that has geometry."""
-        return dict((i, e.z()) for i, e in self.by_id.items() if e.z() is not None and not isinstance(e, Level))
+        """{element id: (z min, z max)} of the model elements (not levels, not groups -- a group is its
+        members -- and not the lines that lie on a level's plane, which follow it by design)."""
+        return dict((i, e.z()) for i, e in self.by_id.items() if e.z() is not None and
+                    not isinstance(e, (Level, Group, CurveElement, Sketch)))
 
 
 class FakeRevit(object):
@@ -535,17 +653,28 @@ class FakeRevit(object):
         e["elbow"] = FamilyInstance(d, "OST_PipeFitting", "Elbow 100", {"INSTANCE_ELEVATION_PARAM": mm(2800)},
                                     level=L["L01"], mep_run=e["pipe"],
                                     zfn=lambda x: e["pipe"].z())
-        # model group on L01: members follow the group origin
-        grp = e["group"] = Group(d, "OST_IOSModelGroups", "Toilet Core", {"GROUP_LEVEL": L["L01"],
-                                                                          "GROUP_OFFSET_FROM_LEVEL": 0.0},
-                                 level=L["L01"], zfn=lambda g: (g.lvl("GROUP_LEVEL") + g.v("GROUP_OFFSET_FROM_LEVEL"),
-                                                                g.lvl("GROUP_LEVEL") + g.v("GROUP_OFFSET_FROM_LEVEL")
-                                                                + mm(2400)))
-        member = e["group member"] = Element(d, "OST_Walls", "Partition 100", {
-            "WALL_BASE_CONSTRAINT": L["L01"], "WALL_BASE_OFFSET": 0.0, "WALL_HEIGHT_TYPE": None,
-            "WALL_TOP_OFFSET": 0.0, "WALL_USER_HEIGHT_PARAM": mm(2400)}, level=L["L01"],
-            zfn=lambda m: (grp.z()[0], grp.z()[0] + mm(2400)))
-        member.GroupId = grp.Id
+        # model group type "Toilet Core" placed twice: on L01 (top to L02) and on L03 (top to Roof).
+        # As in Revit, members keep their own level constraints (wall base/top, door sill); Revit checks
+        # at commit that both instances still have identical members relative to their origins.
+        core_type = GroupType(d, None, "Toilet Core", {})
+
+        def core(key, base, top):
+            w = Element(d, "OST_Walls", "Partition 100", {
+                "WALL_BASE_CONSTRAINT": base, "WALL_BASE_OFFSET": 0.0, "WALL_HEIGHT_TYPE": top,
+                "WALL_TOP_OFFSET": 0.0, "WALL_USER_HEIGHT_PARAM": 0.0}, level=base, zfn=wall_z)
+            dr = FamilyInstance(d, "OST_Doors", "Single Flush 800x2100", {"INSTANCE_SILL_HEIGHT_PARAM": 0.0},
+                                level=base, host=w,
+                                zfn=lambda x: (x.lvl_of() + x.v("INSTANCE_SILL_HEIGHT_PARAM"),
+                                               x.lvl_of() + x.v("INSTANCE_SILL_HEIGHT_PARAM") + mm(2100)))
+            e[key] = Group(d, core_type, base, 0.0, [w, dr])
+            e[key + " wall"], e[key + " door"] = w, dr
+        core("group", L["L01"], L["L02"])
+        core("group B", L["L03"], L["Roof"])
+        # lines on a level's plane: a slab's boundary sketch and a room separation line
+        e["sketch"] = Sketch(d, "OST_SketchLines", "Slab 300 boundary", {}, level=L["L02"],
+                             zfn=lambda x: (L["L02"].Elevation, L["L02"].Elevation))
+        e["separation"] = CurveElement(d, "OST_RoomSeparationLines", "Room Separation", {}, level=L["L01"],
+                                       zfn=lambda x: (L["L01"].Elevation, L["L01"].Elevation))
         # in-place / generic family with no offset parameter at all: only a move can keep it in place
         e["generic"] = FamilyInstance(d, "OST_GenericModel", "In-place plinth", {}, level=L["L01"],
                                       zfn=lambda x: (L["L01"].Elevation + mm(1000), L["L01"].Elevation + mm(1200)))
@@ -556,6 +685,7 @@ class FakeRevit(object):
                                   zfn=lambda r: (L["L01"].Elevation, L["L03"].Elevation))
         for x in list(d.by_id.values()):
             x.lvl_of = (lambda el: lambda: d.by_id[el.LevelId.Value].Elevation)(x)
+        d.group_locked = "group_locked" in extra
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self.url = "http://127.0.0.1:%d/revit_mcp/execute_code/" % self.server.server_address[1]

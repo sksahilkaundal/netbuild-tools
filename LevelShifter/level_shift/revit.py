@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 import uuid
 
+from .core import config
 from .payload import CODE
 
 MARK = "@@LS-%s:%s@@"
@@ -112,11 +113,7 @@ def list_docs_code(nonce):
     return LIST_DOCS % {"nonce": nonce}
 
 
-def action_code(nonce, action, match, moves=(), tol_ft=0.0, rounds=4, move_fallback=True,
-                rollback_on_drift=True, max_rows=20000):
+def action_code(nonce, action, match, moves=(), s=None):
     """The payload with its per-call config. ``moves``: [{"id", "name", "delta" (feet)}]."""
-    cfg = {"nonce": nonce, "action": action, "match": list(match or []),
-           "moves": [{"id": int(m["id"]), "name": m["name"], "delta": float(m["delta"])} for m in moves],
-           "tol": float(tol_ft), "rounds": int(rounds), "move_fallback": bool(move_fallback),
-           "rollback_on_drift": bool(rollback_on_drift), "max_rows": int(max_rows)}
-    return "# ---- Netbuild Level Shift (one call)\n_LS = %s\n%s" % (py_literal(cfg), CODE)
+    return "# ---- Netbuild Level Shift (one call)\n_LS = %s\n%s" % (
+        py_literal(config(nonce, action, match, moves, s)), CODE)

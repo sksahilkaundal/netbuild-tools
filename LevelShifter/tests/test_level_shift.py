@@ -19,7 +19,8 @@ sys.path.insert(0, HERE)
 from fake_revit import FakeRevit, mm  # noqa: E402
 from level_shift import cli, revit  # noqa: E402
 from level_shift.payload import CODE  # noqa: E402
-from level_shift.runner import MoveSpec, Runner, resolve  # noqa: E402
+from level_shift.core import MoveSpec, resolve  # noqa: E402
+from level_shift.runner import Runner  # noqa: E402
 from level_shift.settings import Settings  # noqa: E402
 from level_shift.units import fmt, parse_length  # noqa: E402
 
@@ -137,15 +138,17 @@ class WorkflowTests(Fixture):
         self.assertTrue(res.ok, self.explain(res))
         self.assertTrue(self.unchanged())
         plan = res.info["plan"]
-        cats = dict((c, n) for lid, c, n in plan["counts"])
-        self.assertEqual(cats["Walls"], 3)                  # base L01 x2 + top L01 x1; group member excluded
-        for c in ("Doors", "Furniture", "StructuralColumns", "Stairs", "Rooms", "PipeCurves", "Ceilings",
+        cats = dict((c, n) for lid, c, n in plan["counts"] if lid == self.fake.lv["L01"].Id.Value)
+        self.assertEqual(cats["Walls"], 4)       # base L01 x2 (one in the Toilet Core group) + top L01 x1 + ...
+        self.assertEqual(cats["Doors"], 2)       # the door in the L01-L02 wall + the group's door
+        for c in ("Furniture", "StructuralColumns", "Stairs", "Rooms", "PipeCurves", "Ceilings",
                   "IOSModelGroups", "GenericModel"):
             self.assertIn(c, cats)
         self.assertNotIn("PipeFitting", cats)               # follows the pipe
         self.assertNotIn("LightingFixtures", cats)          # hosted on the L02 slab
+        self.assertNotIn("<Sketch>", cats)                  # lines follow their level's plane
         self.assertEqual([r["name"] for r in plan["no_offset"]], ["In-place plinth"])
-        self.assertEqual(plan["group_members"], 1)
+        self.assertEqual((plan["group_members"], plan["groups"]), (2, 1))
         self.assertTrue([c for c in res.checks if c.label == "Model groups" and c.ok is None])
 
     def test_trial_rolls_back(self):
@@ -175,14 +178,24 @@ class WorkflowTests(Fixture):
         self.assertEqual(self.off("beam", "STRUCTURAL_BEAM_END1_ELEVATION"), 150)
         self.assertEqual(self.off("room", "ROOM_UPPER_OFFSET"), 150)
         self.assertEqual(self.off("group", "GROUP_OFFSET_FROM_LEVEL"), -300)
+        # group members are compensated in place, like any other element; the L03 instance is untouched
+        self.assertEqual(self.off("group wall", "WALL_BASE_OFFSET"), -300)
+        self.assertEqual(self.off("group wall", "WALL_TOP_OFFSET"), 150)
+        self.assertEqual(self.off("group door", "INSTANCE_SILL_HEIGHT_PARAM"), -300)
+        self.assertEqual(self.off("group B wall", "WALL_BASE_OFFSET"), 0)
+        self.assertEqual(res.info["result"]["groups"], [])
         self.assertEqual(self.off("pipe", "RBS_OFFSET_PARAM"), 2500)
-        # followers untouched: the fitting, the face-hosted light, the group member
+        # followers untouched: the fitting, the face-hosted light
         self.assertEqual(self.off("elbow", "INSTANCE_ELEVATION_PARAM"), 2800)
         self.assertEqual(self.off("light", "INSTANCE_FREE_HOST_OFFSET_PARAM"), 0)
-        self.assertEqual(self.off("group member", "WALL_BASE_OFFSET"), 0)
+        # sketch / separation lines follow their level by design: reported, never moved back
+        self.assertEqual(res.info["result"]["on_plane"], {"<Sketch>": 1, "<Room Separation>": 1})
+        self.assertEqual(round(self.fake.el["sketch"].z()[0] * 304.8, 6), 6850)
+        self.assertEqual((self.fake.el["sketch"].free, self.fake.el["separation"].free), (0.0, 0.0))
+        self.assertIn("Lines on the level's plane", [c.label for c in res.checks])
         # no offset parameter: measured, then moved back
         self.assertEqual(round(self.fake.el["generic"].free * 304.8, 6), -300)
-        self.assertEqual(self.fake.el["wall L03-Roof"].p, self.params0[self.fake.el["wall L03-Roof"].Id.Value][0])
+        self.assertEqual(self.fake.el["wall L03-Roof"].p, self.params0[self.fake.el["wall L03-Roof"].Id.Value][1]["p"])
         rows = dict((r["name"], r) for r in res.info["result"]["rows"])
         self.assertEqual(rows["In-place plinth"]["method"], "moved")
         self.assertEqual(rows["Basic Wall 200"]["rule"], "WALL_BASE_CONSTRAINT+WALL_HEIGHT_TYPE")
@@ -259,6 +272,56 @@ class DriftTests(Fixture):
         self.assertTrue(res.info["result"]["committed"])
         self.assertEqual(self.moved(), {"Sloped roof": (300.0, 0.0)})            # reported, kept as asked
         self.assertEqual(self.elev("L01"), 3800)
+
+
+class LockedGroupTests(Fixture):
+    """Revit refuses to edit group members in place: the move must ungroup, fix and regroup."""
+    extra = ("group_locked",)
+
+    def group_types(self):
+        from fake_revit import Group
+        return sorted(self.doc.by_id[g.type_id.Value].Name for g in self.doc.by_id.values() if isinstance(g, Group))
+
+    def test_ungroup_fix_regroup_one_instance(self):
+        wall, door = self.fake.el["group wall"], self.fake.el["group door"]
+        res = self.r.run("apply", None, [MoveSpec("L01", "by", 300), MoveSpec("L02", "to", 6850)])
+        self.assertTrue(res.ok, self.explain(res))
+        self.assertEqual(self.moved(), {})
+        self.assertEqual(self.group_types(), ["Toilet Core", "Toilet Core (levels moved)"])   # L03 copy keeps its type
+        new = self.doc.by_id[wall.GroupId.Value]
+        self.assertEqual(sorted(i.Value for i in new.GetMemberIds()), sorted([wall.Id.Value, door.Id.Value]))
+        self.assertEqual(self.off("group wall", "WALL_TOP_OFFSET"), 150)
+        self.assertTrue([c for c in res.checks if c.label == "Groups" and "Revit refused" in c.detail])
+        self.assertEqual([(g["type"], g["new_type"]) for g in res.info["result"]["groups"]],
+                         [("Toilet Core", "Toilet Core (levels moved)")])
+
+    def test_every_instance_affected_keeps_the_type_name(self):
+        res = self.r.run("apply", None, [MoveSpec("L01", "by", 300), MoveSpec("L03", "by", 300)])
+        self.assertTrue(res.ok, self.explain(res))
+        self.assertEqual(self.moved(), {})
+        self.assertEqual(self.group_types(), ["Toilet Core", "Toilet Core (2)"])
+
+    def test_trial_leaves_groups_as_they_were(self):
+        res = self.r.run("trial", None, [MoveSpec("L01", "by", 300)])
+        self.assertTrue(res.ok, self.explain(res))
+        self.assertEqual(self.doc.snapshot(), self.params0)
+        self.assertEqual(self.group_types(), ["Toilet Core", "Toilet Core"])
+
+    def test_pinned_group_is_reported_not_forced(self):
+        self.fake.el["group"].Pinned = True
+        res = self.r.run("apply", None, [MoveSpec("L01", "by", 300)])
+        self.assertFalse(res.ok)
+        self.assertEqual(self.doc.snapshot(), self.params0)
+        self.assertIn("could not ungroup 'Toilet Core'", self.explain(res))
+        self.assertIn("The group is pinned", self.explain(res))
+
+    def test_option_off_reports_the_group_error(self):
+        self.s["fix_groups"] = False
+        res = self.r.run("apply", None, [MoveSpec("L01", "by", 300)])
+        self.assertFalse(res.ok)
+        self.assertEqual(self.doc.snapshot(), self.params0)
+        self.assertIn("Group instances of the same type do not contain identical members", self.explain(res))
+        self.assertIn("[element ids", self.explain(res))
 
 
 class CliTests(Fixture):

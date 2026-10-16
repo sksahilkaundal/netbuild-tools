@@ -2,6 +2,7 @@
 
 import os
 import queue
+import sys
 import threading
 import time
 import tkinter as tk
@@ -9,8 +10,9 @@ from tkinter import messagebox, simpledialog, ttk
 from tkinter.scrolledtext import ScrolledText
 
 from . import __version__
-from .runner import MoveSpec, Runner, open_folder
-from .settings import DEFAULTS, MAX_LEVELS, Settings
+from .core import MAX_LEVELS, MoveSpec, counterpart, define_value
+from .runner import Runner, open_folder
+from .settings import DEFAULTS, Settings
 from .units import fmt, from_ft, parse_length
 
 PAD = {"padx": 6, "pady": 3}
@@ -76,17 +78,13 @@ class Row(object):
             src = self.new if mode == "to" else self.delta
             dst = self.delta if mode == "to" else self.new
             if not src.get().strip():
-                dst.set("")
                 self.mode = None
-            else:
-                try:
-                    v = parse_length(src.get(), u)
-                except ValueError:
-                    dst.set("?")
-                    self.arrow.config(text="")
-                    return
-                if cur is not None:
-                    dst.set("%+.*f" % (DIGITS[u], v - cur) if mode == "to" else "%.*f" % (DIGITS[u], cur + v))
+            try:
+                dst.set(counterpart(cur, mode, src.get(), u))
+            except ValueError:
+                dst.set("?")
+                self.arrow.config(text="")
+                return
             self._arrow()
         finally:
             self._guard = False
@@ -179,11 +177,8 @@ class DefineDialog(object):
         self.preview()
 
     def _value(self):
-        u = self.row.app.units()
-        if self.how.get() == "to":
-            return "to", parse_length(self.abs.get(), u)
-        v = abs(parse_length(self.amount.get(), u))
-        return "by", v if self.dir.get() == "up" else -v
+        return define_value(self.how.get(), self.abs.get(), self.amount.get(), self.dir.get() == "up",
+                            self.row.app.units())
 
     def preview(self):
         u, cur = self.row.app.units(), self.row.cur_value()
@@ -353,7 +348,9 @@ class App(object):
         for j, (key, label) in enumerate((
                 ("move_fallback", "An element with no offset parameter that still moved is moved back by (0, 0, -dz)"),
                 ("rollback_on_drift", "Undo all if anything moves: Apply keeps the result only when every element "
-                                      "kept its position"))):
+                                      "kept its position"),
+                ("fix_groups", "Model groups: when members cannot be kept in place, ungroup them, fix them and "
+                               "regroup (keeps the group type name where no other instance uses it)"))):
             v = tk.BooleanVar(value=bool(self.s[key]))
             self.bools[key] = v
             ttk.Checkbutton(f, text=label, variable=v).grid(row=10 + j, column=0, columnspan=2, sticky="w", **PAD)
@@ -542,12 +539,18 @@ class App(object):
             self.status.set("Cancelling -- Revit finishes (or rolls back) the call it is on.")
 
 
-def main():
+def main(argv=None):
+    """``--model TEXT`` binds to the model whose title contains TEXT (the pyRevit button passes the
+    model it was clicked from)."""
+    argv = sys.argv[1:] if argv is None else argv
+    model = argv[argv.index("--model") + 1] if "--model" in argv[:-1] else None
     root = tk.Tk()
     try:
         ttk.Style().theme_use("vista" if os.name == "nt" else "clam")
     except tk.TclError:
         pass
-    App(root)
+    app = App(root)
+    if model:
+        app.match.set(model)
     root.mainloop()
     return 0

@@ -8,6 +8,39 @@ This is the same kind of tool as the ProjectA Plot Runner: a desktop window and 
 to Revit through the pyRevit MCP listener. No Revit add-in install is needed beyond pyRevit + the MCP
 extension that Claude and the Plot Runner already use.
 
+## Three ways to run it
+
+| | What | Needs |
+|---|---|---|
+| **Level Shift** ribbon button | **Runs directly inside Revit.** Same window: 10 rows, read-only highlighted current elevation, Define new level…, Check / Trial / Apply. The engine runs in Revit's own process | pyRevit only (no exe, no MCP listener) |
+| **Level Shifter App** ribbon button | Opens `LevelShifter.exe` bound to the model you clicked it from | the exe + the pyRevit MCP listener running |
+| `LevelShifter.exe` / `LevelShift.exe` | The standalone window and the command line | the pyRevit MCP listener running |
+
+All three use the same engine (`level_shift/payload.py`), so the results are identical.
+
+### Install the ribbon buttons (pyRevit)
+
+1. Download `LevelShifter-windows` from **Actions → Build Level Shifter (Windows exe)**. Its
+   `pyRevit\Netbuild.extension` folder already holds the exe in `bin\`.
+2. Copy `Netbuild.extension` to a folder of your choice, for example `C:\pyRevit-Extensions\`.
+3. Register that folder with pyRevit, then **Reload**. You can do this in either of two ways:
+   - **pyRevit → Settings → Custom Extension Directories**;
+   - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
+4. A **Netbuild** tab appears with a **Levels** panel holding **Level Shift** and **Level Shifter App**.
+
+When **Level Shifter App** can't find the exe, it asks for it once. It looks in this order:
+1. the path you picked (Shift+Click to change it);
+2. `Netbuild.extension\bin\`;
+3. `%LOCALAPPDATA%\Netbuild\LevelShifter\`.
+
+**Level Shift** (direct) keeps its options in the pyRevit config: units, tolerance, *move back
+elements without an offset parameter*, and *undo all if anything moves*. It writes logs and element
+CSVs to `%APPDATA%\Netbuild\LevelShift\logs`.
+
+To update the extension after changing the engine, run `python LevelShifter/sync_pyrevit_lib.py`.
+It copies the shared files into `Netbuild.extension\lib\level_shift`, and the tests fail while the
+copies differ.
+
 ## The window
 
 | Column | What it is |
@@ -57,16 +90,51 @@ and status.
 
    These elements are **not** edited because they follow something else:
    - face-/wall-hosted families follow their host;
-   - group members follow the group;
    - nested families follow their parent;
-   - MEP fittings and accessories follow their connected run.
-3. **Measure, then correct.** Every element is measured again. If one still moved as a whole (min Z
-   and max Z moved by the same dz), its own offsets are corrected by −dz. If it has no offset
-   parameter (for example an in-place family), it is **moved** by (0, 0, −dz). An element whose host,
-   group or MEP run is still being corrected waits for the next round. There are up to 4 rounds.
+   - MEP fittings and accessories follow their connected run;
+   - sketch lines (floor / opening / railing boundaries), room / area / space separation lines and
+     model lines lie on their level's plane and follow it by design. The element they shape keeps
+     its position through its own offset. They are reported as *Lines on the level's plane*, never
+     counted as moved, and never moved back.
+3. **Measure, then correct.** Every element is measured again.
+   - If an element's base and top moved by different amounts (a wall whose top level moved), its base
+     offset is corrected by the base's dz and its top offset by the top's dz.
+   - If it moved as a whole, its offsets are corrected by −dz.
+   - If it has no offset parameter (for example an in-place family), it is **moved** by (0, 0, −dz).
+   - An element whose host or MEP run is still being corrected waits for the next round.
+
+   There are up to 4 rounds.
 4. **Report.** Anything that still differs is listed by Element Id. If its shape changed (min and max
-   moved differently), it is reported as *changed shape*: for example, a roof or floor sloped by a
-   slope arrow that ends on the moved level. The geometry decides the result, not the parameter edits.
+   moved differently and cannot be corrected), it is reported as *changed shape*: for example, a roof
+   or floor sloped by a slope arrow that ends on the moved level. The geometry decides the result,
+   not the parameter edits.
+
+### Model groups
+
+In Revit, group members keep their **own** level constraints: a door's sill follows its level, and a
+wall's top follows its top constraint. Revit also checks that every instance of a group type has
+identical members relative to its origin. The tool therefore works in three steps:
+
+1. It compensates group members **in place**, like any other element, and keeps the group origin
+   fixed (Origin Level Offset). Nothing moves, so every instance stays identical.
+2. In some cases the members cannot be fixed in place:
+   - Revit refuses the move (*Group instances of the same type do not contain identical members*);
+   - a member still moves after the move.
+
+   When that happens, the affected group instances are **ungrouped**. Their members are fixed as free
+   elements and then **regrouped**. Only the affected instances are touched; nested groups are handled
+   from the innermost out.
+3. The new group type is named as follows:
+   - it keeps the **original name** when no other instance uses it (the old type is deleted;
+     several regrouped instances become `Name`, `Name (2)`, …);
+   - otherwise it is named `Name (levels moved)`, because an instance on a level that did not move
+     still uses the original type.
+
+   Element Ids of the members do not change, so their tags stay. Attached detail groups have to be
+   re-attached, and Check / Apply says when that applies.
+
+Untick **Groups: ungroup, fix and regroup** to forbid this. The move then stops with Revit's group
+error, and the Element Ids are listed.
 
 Revit **warnings** raised by the move (overlaps, room separation, …) are dismissed and listed.
 Any **error** rolls the whole move back.
@@ -119,6 +187,7 @@ LevelShift setup --set tolerance_mm=0.5                   :: settings
 | `correction_rounds` | 4 | Rounds of measure and correct after the move |
 | `move_fallback` | true | An element with no offset parameter is moved back by (0, 0, −dz) |
 | `rollback_on_drift` | true | Apply keeps the result only when every element kept its position |
+| `fix_groups` | true | Group members that cannot be kept in place: ungroup, fix, regroup (see *Model groups*) |
 | `apply_timeout_seconds` | 3600 | Trial and Apply scan and measure the whole model, so a large model can take minutes |
 
 ## Tests
@@ -137,6 +206,9 @@ and TransactionGroups really roll back. The model holds:
 - a model group and its member;
 - an in-place family with no offset parameter;
 - optionally, a sloped roof that changes shape.
+
+Both ribbon buttons are also run end to end, with pyRevit and WPF stubbed (`tests\pyrevit_stubs.py`).
+The stub parses the real XAML and fires the WPF events.
 
 The tests cover:
 - that every element keeps its position when two levels move in opposite directions;

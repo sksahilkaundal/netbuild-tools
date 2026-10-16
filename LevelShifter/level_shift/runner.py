@@ -7,7 +7,6 @@ Revit's answer is trusted only through what it measured: every model element's b
 before and after.  An element that still moved is reported by Id, never hidden.
 """
 
-import csv
 import datetime
 import os
 import subprocess
@@ -15,17 +14,8 @@ import sys
 import threading
 
 from . import revit
-from .settings import MAX_LEVELS
-from .units import FEET, fmt, fmt_ft, from_ft, parse_length, to_ft
-
-
-class Check(object):
-    def __init__(self, label, ok, detail=""):
-        self.label, self.ok, self.detail = label, ok, detail
-
-    def __str__(self):
-        mark = "OK  " if self.ok is True else ("WARN" if self.ok is None else "FAIL")
-        return "[%s] %s%s" % (mark, self.label, (" -- " + self.detail) if self.detail else "")
+from .core import Check, plan_checks, resolve, result_checks, write_rows_csv
+from .units import FEET, fmt_ft
 
 
 class StepResult(object):
@@ -47,85 +37,6 @@ class Aborted(Exception):
     pass
 
 
-class MoveSpec(object):
-    """One row: a level (name or id) and either a new elevation ('to') or a move ('by'), in ``units``."""
-
-    def __init__(self, level, mode, value):
-        if mode not in ("to", "by"):
-            raise ValueError("mode must be 'to' or 'by'")
-        self.level, self.mode, self.value = level, mode, float(value)
-
-    @classmethod
-    def parse(cls, text, mode, units):
-        """'Level 01=3800' (mode to) / 'Level 01=+300' (mode by); the value may carry mm / m."""
-        name, sep, val = (text or "").rpartition("=")
-        if not sep or not name.strip():
-            raise ValueError("expected LEVEL=VALUE, got %r" % text)
-        return cls(name.strip(), mode, parse_length(val, units))
-
-    def as_dict(self):
-        return {"level": self.level, "mode": self.mode, "value": self.value}
-
-
-def find_level(levels, ref):
-    ref = ("%s" % ref).strip()
-    for lv in levels:
-        if str(lv["id"]) == ref:
-            return lv
-    hits = [lv for lv in levels if lv["name"].strip().lower() == ref.lower()]
-    return hits[0] if len(hits) == 1 else None
-
-
-def resolve(levels, specs, units, tol_mm=1.0):
-    """[MoveSpec] -> (moves, checks). A move: the level row + 'new' and 'delta' in feet."""
-    checks, moves, seen = [], [], set()
-    tol = to_ft(tol_mm, "mm")
-    if len(specs) > MAX_LEVELS:
-        checks.append(Check("Levels", False, "%d given -- at most %d per run" % (len(specs), MAX_LEVELS)))
-    for sp in specs:
-        lv = find_level(levels, sp.level)
-        if lv is None:
-            checks.append(Check("Level %r" % sp.level, False, "not found in the model (names: %s)"
-                                % ", ".join(l["name"] for l in levels)))
-            continue
-        if lv["id"] in seen:
-            checks.append(Check(lv["name"], False, "selected twice"))
-            continue
-        seen.add(lv["id"])
-        v = to_ft(sp.value, units)
-        new, delta = (v, v - lv["elev"]) if sp.mode == "to" else (lv["elev"] + v, v)
-        if abs(delta) < tol:
-            checks.append(Check(lv["name"], None, "no change (%s) -- skipped" % fmt_ft(lv["elev"], units)))
-            continue
-        moves.append(dict(lv, new=new, delta=delta))
-    final = dict((lv["id"], lv["elev"]) for lv in levels)
-    for m in moves:
-        final[m["id"]] = m["new"]
-    names = dict((lv["id"], lv["name"]) for lv in levels)
-    for m in moves:
-        checks.append(Check("%s" % m["name"], True, "%s -> %s  (move %s)" % (
-            fmt_ft(m["elev"], units), fmt_ft(m["new"], units), fmt_ft(m["delta"], units, signed=True))))
-        same = [names[i] for i, e in final.items() if i != m["id"] and abs(e - m["new"]) < tol]
-        if same:
-            checks.append(Check("%s elevation" % m["name"], None, "same elevation as %s" % ", ".join(same)))
-        if m.get("pinned"):
-            checks.append(Check("%s pinned" % m["name"], None, "the level is pinned -- Revit may refuse to move it"))
-        if m.get("monitored"):
-            checks.append(Check("%s monitored" % m["name"], None,
-                                "Copy/Monitor level -- a Coordination Review will flag it in the other model"))
-    old = dict((lv["id"], lv["elev"]) for lv in levels)
-    crossed = set()
-    for m in moves:
-        for i in final:
-            if i != m["id"] and (old[i] < m["elev"]) != (final[i] < m["new"]):
-                crossed.add(" / ".join(sorted((m["name"], names[i]))))
-    if crossed:
-        checks.append(Check("Level order", None, "the stacking order changes: %s" % ", ".join(sorted(crossed))))
-    if not moves and not [c for c in checks if c.ok is False]:
-        checks.append(Check("Levels", False, "nothing to move"))
-    return moves, checks
-
-
 class Call(object):
     """One POST to Revit on a background thread, so Cancel stays responsive."""
 
@@ -140,9 +51,6 @@ class Call(object):
                 self.reply = revit.Reply(error="%s: %s" % (type(e).__name__, e))
             self.done.set()
         threading.Thread(target=work, daemon=True).start()
-
-
-ROW_FIELDS = ["id", "category", "name", "level", "rule", "params", "method", "drift", "status"]
 
 
 class Runner(object):
@@ -203,12 +111,8 @@ class Runner(object):
 
     def _action(self, action, moves=(), timeout=None):
         nonce = revit.new_nonce()
-        code = revit.action_code(
-            nonce, action, self.s.match(),
-            [{"id": m["id"], "name": m["name"], "delta": m["delta"]} for m in moves],
-            tol_ft=to_ft(float(self.s["tolerance_mm"]), "mm"), rounds=int(self.s["correction_rounds"]),
-            move_fallback=bool(self.s["move_fallback"]), rollback_on_drift=bool(self.s["rollback_on_drift"]),
-            max_rows=int(self.s["max_rows"]))
+        code = revit.action_code(nonce, action, self.s.match(),
+                                 [{"id": m["id"], "name": m["name"], "delta": m["delta"]} for m in moves], self.s)
         reply = self._call(code, timeout or float(self.s["probe_timeout_seconds"]), "LS: %s" % action)
         self._need(reply, nonce, action.capitalize())
         for line in reply.text_lines():
@@ -281,62 +185,19 @@ class Runner(object):
         if plan is None:
             raise Aborted("Plan: no answer")
         res.info["plan"] = plan
-        names = dict((m["id"], m["name"]) for m in moves)
-        res.add("Elements driven by the moved levels", True, "%d to compensate (of %d model elements)"
-                % (plan["compensate"], plan["elements"]))
-        by_level = {}
-        for lid, cat, n in plan["counts"]:
-            by_level.setdefault(lid, []).append((cat, n))
-        for lid in names:
-            cats = sorted(by_level.get(lid, []), key=lambda kv: -kv[1])
-            self.say("  %s: %s" % (names[lid], ", ".join("%s x%d" % kv for kv in cats) or "no hosted elements"))
-        if plan["no_offset"]:
-            res.add("No offset parameter", None, "%d element(s) -- measured after the move and moved back if they "
-                    "drift: %s" % (len(plan["no_offset"]), ", ".join("%s %s" % (r["category"], r["id"])
-                                                                       for r in plan["no_offset"][:10])))
-        if plan["group_members"]:
-            res.add("Model groups", None, "%d member(s) in %d group(s) reference a moved level -- the group "
-                    "origin is compensated; members are measured" % (plan["group_members"], plan["groups"]))
-        for b in plan["blockers"]:
-            res.add("Blocked: %s %s" % (b["category"], b["id"]), False, "%s -- %s" % (b["name"], b["why"]))
+        checks, lines = plan_checks(plan, moves)
+        res.checks.extend(checks)
+        for line in lines:
+            self.say(line)
 
     def _report_result(self, action, r, res):
-        rows = r.get("rows") or []
         res.info["result"] = r
-        u = self.units
-        if r.get("stopped"):
-            res.add("Not applied", False, r["stopped"])
-            return
-        res.add("Elements measured", True, "%d (bounding box min/max Z, before and after)" % r.get("measured", 0))
-        by_method = {}
-        for row in rows:
-            by_method[row["method"] or "-"] = by_method.get(row["method"] or "-", 0) + 1
-        res.add("Compensated", True, ", ".join("%s x%d" % kv for kv in sorted(by_method.items())) or "nothing needed")
-        drift = r.get("drift") or []
-        if drift:
-            res.add("Still moved", False, "%d element(s): %s" % (len(drift), "; ".join(
-                "%s %s %s (%s)" % (d["category"], d["id"], fmt(from_ft(d["drift"], u), u, True), d["status"])
-                for d in drift[:15])) + (" ..." if len(drift) > 15 else ""))
-        else:
-            res.add("Every element kept its X, Y, Z", True, "within %s mm" % self.s["tolerance_mm"])
-        for e in r.get("errors") or []:
-            res.add("Revit error", False, e)
-        warns = r.get("warnings") or []
-        if warns:
-            uniq = sorted(set(warns))
-            res.add("Revit warnings (dismissed)", None, "%d: %s" % (len(warns), " | ".join(uniq[:5])))
-        for lv in r.get("levels_after") or []:
-            self.say("  %s now %s" % (lv["name"], fmt_ft(lv["elev"], u)))
-        if action == "trial":
-            res.add("Trial", True if not drift and not r.get("errors") else None,
-                    "rolled back -- the model is unchanged")
-        elif r.get("committed"):
-            res.add("Applied", True, "one Undo entry in Revit: 'Netbuild Level Shift'. Save / Synchronize when happy")
-        else:
-            res.add("Applied", False, "rolled back -- the model is unchanged (%s)" % (
-                "an element still moved; untick 'Undo all if anything moves' on Setup to keep it anyway"
-                if drift else "Revit error"))
-        res.info["rows_csv"] = self._write_rows(action, rows)
+        checks, lines = result_checks(action, r, self.units, self.s["tolerance_mm"])
+        res.checks.extend(checks)
+        for line in lines:
+            self.say(line)
+        if not r.get("stopped"):
+            res.info["rows_csv"] = self._write_rows(action, r.get("rows") or [])
 
     def _say_failures(self, res):
         for c in res.checks:
@@ -347,17 +208,8 @@ class Runner(object):
         if not rows:
             return None
         stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(self.s.logs_dir(), "%s_%s_elements.csv" % (stamp, action))
-        u = self.units
-        with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.writer(f)
-            w.writerow(ROW_FIELDS[:-2] + ["drift (%s)" % u, "status"])
-            for r in rows:
-                ps = "; ".join("%s %s -> %s" % (n, fmt(from_ft(a, u), u), fmt(from_ft(b, u), u))
-                               for n, a, b in r.get("params") or [])
-                w.writerow([r["id"], r["category"], r["name"], r["level"], r["rule"], ps, r["method"],
-                            round(from_ft(r["drift"], u), 3), r["status"]])
-        return path
+        return write_rows_csv(os.path.join(self.s.logs_dir(), "%s_%s_elements.csv" % (stamp, action)),
+                              rows, self.units)
 
 
 def open_folder(path):
