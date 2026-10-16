@@ -4,6 +4,7 @@ Developer-only release build for Revit Status + its KeyGen (never shipped).
 
     py -3.14 build_revitstatus_release.py            # compile + freeze + self-test into the scratch folder
     py -3.14 build_revitstatus_release.py --deploy   # ... then mirror both apps into Portable\\ and restart the tray
+    py -3.14 build_revitstatus_release.py --no-selftest   # CI (no licensed PC): compile + freeze + audit only
 
 Steps
   1. Nuitka (zig backend) compiles revitstatus_core.py -> native .pyd (no source/bytecode ships).
@@ -219,8 +220,11 @@ def main():
     app = freeze(APP, "RevitStatus.pyw")
     shutil.copy2(os.path.join(SRC, "RevitStatus_LICENSE.txt"), os.path.join(app, "LICENSE.txt"))   # Netbuild Software Licence Agreement
     kg = freeze(KEYGEN, "RevitStatus_KeyGen_GUI.pyw", extra_hidden=["revitstatus_sheet_client"])
-    selftest(app)
-    window_opens(os.path.join(kg, KEYGEN + ".exe"), KEYGEN)
+    if "--no-selftest" in sys.argv:   # CI: the runner is not licensed; compile, freeze and the audit still ran
+        print("   self-tests skipped (--no-selftest)")
+    else:
+        selftest(app)
+        window_opens(os.path.join(kg, KEYGEN + ".exe"), KEYGEN)
     if "--deploy" in sys.argv:
         app_dst = os.path.join(PORTABLE, APP)
         close_apps([os.path.join(app_dst, APP + ".exe"), os.path.join(PORTABLE, KEYGEN_DIR, KEYGEN + ".exe")])

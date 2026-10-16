@@ -1,0 +1,76 @@
+name: Build Revit MCP Router + Revit Status by Netbuild (Windows)
+
+# Runs the products' own release builds (build_release.py / build_revitstatus_release.py):
+# Nuitka compiles the protected modules to native .pyd, PyInstaller freezes the apps, and the scripts
+# audit that no source or bytecode of the protected modules is in the bundle. The licensed-PC
+# self-tests are skipped (--no-selftest): a CI runner has no licence. Run them on your PC before release.
+
+on:
+  push:
+    branches: [main, "netbuild/**"]
+    paths:
+      - "scripts/RevitMcpRouter/**"
+      - "scripts/revitstatus_*"
+      - "scripts/RevitStatus*"
+      - "scripts/build_revitstatus_release.py"
+      - "design/**"
+      - "LICENSE"
+      - ".github/workflows/build-router-revitstatus-exe.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      RMR_BUILD_DIR: ${{ runner.temp }}\rmr_build
+      RS_BUILD_DIR: ${{ runner.temp }}\rs_build
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.7"        # every release is built with this Python (the build scripts refuse older)
+
+      - name: Install build tools
+        run: python -m pip install nuitka ziglang pyinstaller "mcp[cli]<2" httpx psutil pystray pillow
+
+      - name: Branding / licence-compatibility tests (golden licence values)
+        run: |
+          python scripts/RevitMcpRouter/router_branding_test.py
+          python scripts/revitstatus_branding_test.py
+
+      - name: Build Revit MCP Router by Netbuild
+        run: python scripts/RevitMcpRouter/build_release.py --no-selftest
+
+      - name: Build Revit Status by Netbuild (+ developer KeyGen)
+        run: python scripts/build_revitstatus_release.py --no-selftest
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force pkg/router, pkg/status, pkg/keygen | Out-Null
+          Copy-Item -Recurse "$env:RMR_BUILD_DIR/dist/Revit MCP Router" pkg/router/
+          Copy-Item -Recurse "$env:RS_BUILD_DIR/dist/Revit Status" pkg/status/
+          Copy-Item -Recurse "$env:RS_BUILD_DIR/dist/Revit Status KeyGen" "pkg/keygen/Revit Status KeyGen (developer only)"
+          Get-ChildItem pkg -Recurse -File -Filter *.exe | Format-Table FullName, Length
+          Get-ChildItem pkg -Recurse -File -Filter LICENSE.txt | Format-Table FullName, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RevitMcpRouter-by-Netbuild-windows
+          path: pkg/router/
+          retention-days: 90
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RevitStatus-by-Netbuild-windows
+          path: pkg/status/
+          retention-days: 90
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RevitStatus-KeyGen-developer-only
+          path: pkg/keygen/
+          retention-days: 14

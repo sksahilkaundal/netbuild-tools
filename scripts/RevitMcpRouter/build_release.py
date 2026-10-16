@@ -4,6 +4,7 @@ Developer-only release build for Revit MCP Router (never shipped).
 
     py -3.14 build_release.py            # compile + freeze + self-test into the scratch folder
     py -3.14 build_release.py --deploy   # ... then robocopy /MIR to Portable\\Revit MCP Router and zip
+    py -3.14 build_release.py --no-selftest   # CI (no licensed PC): compile + freeze + bundle audit only
 
 Steps
   1. Nuitka (zig backend, no MSVC needed) compiles the protected modules to native .pyd:
@@ -277,7 +278,10 @@ def main():
     stage_entries()
     app = freeze(write_spec())
     write_readme(app, ver)
-    selftests(app)
+    if "--no-selftest" in sys.argv:   # CI: the runner is not licensed; compile, freeze and the bundle audit still ran
+        print("   self-tests skipped (--no-selftest)")
+    else:
+        selftests(app)
     if "--deploy" in sys.argv:
         deploy(app, ver)
     print("== build OK: " + app)
