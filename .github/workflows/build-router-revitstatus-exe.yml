@@ -16,6 +16,7 @@ on:
       - "design/**"
       - "LICENSE"
       - ".github/workflows/build-router-revitstatus-exe.yml"
+      - ".github/scripts/router_smoke.py"
   workflow_dispatch:
 
 jobs:
@@ -47,6 +48,17 @@ jobs:
 
       - name: Build Revit MCP Router by Netbuild
         run: python scripts/RevitMcpRouter/build_release.py --no-selftest
+
+      - name: Smoke test the Router exes (window opens, --selftest, --check)
+        run: python .github/scripts/router_smoke.py "$env:RMR_BUILD_DIR/dist/Revit MCP Router" router_setup.png
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: router-smoke-screenshot
+          path: router_setup.png
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Build Revit Status by Netbuild (+ developer KeyGen)
         run: python scripts/build_revitstatus_release.py --no-selftest
