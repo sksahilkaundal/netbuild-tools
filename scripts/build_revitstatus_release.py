@@ -217,6 +217,7 @@ def main():
     print("== Revit Status release build -> %s" % SCRATCH)
     compile_core()
     app = freeze(APP, "RevitStatus.pyw")
+    shutil.copy2(os.path.join(SRC, "RevitStatus_LICENSE.txt"), os.path.join(app, "LICENSE.txt"))   # Netbuild Software Licence Agreement
     kg = freeze(KEYGEN, "RevitStatus_KeyGen_GUI.pyw", extra_hidden=["revitstatus_sheet_client"])
     selftest(app)
     window_opens(os.path.join(kg, KEYGEN + ".exe"), KEYGEN)

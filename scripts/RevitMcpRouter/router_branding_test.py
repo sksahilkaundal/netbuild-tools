@@ -3,8 +3,9 @@
 
     python router_branding_test.py        (or: python -m pytest router_branding_test.py)
 
-* product name, version, publisher, copyright and About content of the Setup app;
-* setup_gui.LICENSE_TEXT == LICENSE.txt beside this file;
+* product name, version, owner, publisher, copyright, licence name and About / Licence content of the Setup app;
+* setup_gui.LICENSE_TEXT == LICENSE.txt beside this file == the repository's root LICENSE
+  (the Netbuild Software Licence Agreement);
 * every value existing licences depend on is UNCHANGED: salts, product names/codes used in the
   key derivation and the sheet, file names, the sheet / API URLs, the secret, and the outputs of
   password_hash / machine_key / _sign for fixed inputs (golden values from v1.3.6). If one of these
@@ -31,24 +32,35 @@ def test_product_strings():
     assert L.PRODUCT_DISPLAY == "Revit MCP Router by Netbuild"
     assert G.APP == L.PRODUCT_DISPLAY
     assert G.VERSION == "1.3.7"
-    assert L.PUBLISHER == "SKAEC.COM"
+    assert L.OWNER == "Netbuild"
+    assert L.PUBLISHER == "Netbuild"
     assert L.WEBSITE == "https://skaec.com"
-    assert L.COPYRIGHT == u"© 2026 SKAEC.COM. All rights reserved."
+    assert L.COPYRIGHT == u"© 2026 Netbuild. All rights reserved."
+    assert L.LICENSE_NAME == "Netbuild Software Licence Agreement (proprietary)"
     assert L.DEVELOPER_EMAIL == "info@skaec.com"
-    assert "Netbuild2026 ·" not in L.COPYRIGHT
+    assert "Netbuild2026 ·" not in L.COPYRIGHT and "SKAEC" not in L.COPYRIGHT
     assert G.DESCRIPTION and len(G.REQUIREMENTS) >= 4
     assert any("Windows 10 or 11" in r for r in G.REQUIREMENTS)
     assert any("%d days" % L.LICENSE_CACHE_GRACE_DAYS in r for r in G.REQUIREMENTS)
     for name in ("_build_about", "_build_licence", "refresh_licence", "_change_key"):
         assert hasattr(G.SetupApp, name), name
+    lic_src = inspect.getsource(G.SetupApp._build_licence)
+    assert "Proprietary software -- owned by %s   |   Website: %s" in lic_src and "Copy licence" in lic_src
+    assert "LICENSE_TEXT" in lic_src and "LICENSE_TEXT" not in inspect.getsource(G.SetupApp._build_about)
+    assert "Licence: %s -- see the Licence tab" in inspect.getsource(G.SetupApp._build_about)
 
 
 def test_license_text_equals_file():
     with open(os.path.join(HERE, "LICENSE.txt"), encoding="utf-8") as fh:
         text = fh.read()
     assert G.LICENSE_TEXT == text, "setup_gui.LICENSE_TEXT differs from LICENSE.txt"
-    assert text.startswith("Revit MCP Router by Netbuild -- Licence Agreement\n")
-    assert "Copyright (c) 2026 SKAEC.COM. All rights reserved." in text
+    assert text.startswith("Netbuild Software Licence Agreement\n")
+    assert "Copyright (c) 2026 Netbuild. All rights reserved." in text
+    assert "Website: https://skaec.com" in text and "Revit MCP Router by Netbuild" in text
+    with open(os.path.join(HERE, "..", "..", "LICENSE"), encoding="utf-8") as fh:
+        assert fh.read() == text, "root LICENSE differs from LICENSE.txt"
+    with open(os.path.join(HERE, "..", "RevitStatus_LICENSE.txt"), encoding="utf-8") as fh:
+        assert fh.read() == text, "RevitStatus_LICENSE.txt differs from LICENSE.txt"
 
 
 def test_licence_constants_unchanged():

@@ -156,9 +156,9 @@ def freeze(spec):
 
 
 def write_readme(app, ver):
-    shutil.copy2(os.path.join(SRC, "LICENSE.txt"), os.path.join(app, "LICENSE.txt"))   # proprietary licence agreement
+    shutil.copy2(os.path.join(SRC, "LICENSE.txt"), os.path.join(app, "LICENSE.txt"))   # Netbuild Software Licence Agreement
     with open(os.path.join(app, "README.txt"), "w", encoding="utf-8") as fh:
-        fh.write("""Revit MCP Router by Netbuild  v%s                       (c) 2026 SKAEC.COM
+        fh.write("""Revit MCP Router by Netbuild  v%s                        (c) 2026 Netbuild
 ==============================================================================
 Lets Claude Code drive ANY of several open Revit sessions (2023-2026 side by
 side), chosen per chat session, reconnecting automatically after a Revit restart
@@ -183,9 +183,10 @@ No admin rights needed. Licensed per computer (see the Licence tab for your Mach
 project is not yet connected to Revit.
 
 Support / licence keys: %s  (include your Machine ID from the Licence tab)
-Publisher: SKAEC.COM - https://skaec.com
-(c) 2026 SKAEC.COM. All rights reserved. Licensed per computer; not transferable; no redistribution.
-Licence agreement: LICENSE.txt in this folder (also on the Setup app's About tab).
+Proprietary software owned by Netbuild - https://skaec.com
+(c) 2026 Netbuild. All rights reserved. Licensed per computer; not transferable; no redistribution.
+Licence agreement: Netbuild Software Licence Agreement - LICENSE.txt in this folder
+(also on the Setup app's Licence tab).
 """ % (ver, ver, "info@skaec.com"))
 
 

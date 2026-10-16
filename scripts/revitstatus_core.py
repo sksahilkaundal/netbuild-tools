@@ -81,15 +81,17 @@ APP_TITLE = "Revit Status"        # part of the key derivation (_k2) and license
 VERSION = "1.2.4"
 APP_DISPLAY = "Revit Status by Netbuild"           # product name shown to the customer
 WINDOW_TITLE = "%s v%s" % (APP_DISPLAY, VERSION)  # main window (also found by title by a second launch)
-PUBLISHER = "SKAEC.COM"
+OWNER = "Netbuild"                # display only (Licence / About tabs)
+PUBLISHER = "Netbuild"
 WEBSITE = "https://skaec.com"
+LICENSE_NAME = "Netbuild Software Licence Agreement (proprietary)"   # RevitStatus_LICENSE.txt
 # This module is compiled to a native .pyd for release (build_revitstatus_release.py);
 # RevitStatus.pyw is only a 10-line stub that calls main().
 MUTEX_NAME = "Local\\RevitStatusApp.SingleInstance"
 SHOW_EVENT_NAME = "Local\\RevitStatusApp.Show"
 
 # ------------------------------------------------------------- licensing ---
-COPYRIGHT = "© 2026 SKAEC.COM. All rights reserved."
+COPYRIGHT = "© 2026 Netbuild. All rights reserved."   # informational in license.json; never validated
 DEVELOPER_NAME = "Sahil Kaundal (Netbuild2026)"
 DEVELOPER_EMAIL = "info@skaec.com"
 LICENSE_FILE = "license.json"
@@ -1274,19 +1276,53 @@ def ensure_activated():
 
 # ------------------------------------------------------------------- UI ---
 # Same text as RevitStatus_LICENSE.txt beside this file (revitstatus_branding_test.py checks it).
-LICENSE_TEXT = """Revit Status by Netbuild -- Licence Agreement
+LICENSE_TEXT = """Netbuild Software Licence Agreement
 
-Copyright (c) 2026 SKAEC.COM. All rights reserved.
+Copyright (c) 2026 Netbuild. All rights reserved.
+Website: https://skaec.com
 
-This software is licensed, not sold. SKAEC.COM grants you a non-exclusive, non-transferable licence to install and use this software on the computer(s) for which a valid licence was issued, for the term of that licence.
+This agreement covers every Netbuild software product -- including Level Shift by
+Netbuild, Plot Runner by Netbuild, Revit MCP Router by Netbuild, Remote Router by
+Netbuild and Revit Status by Netbuild -- together with its updates and documentation
+(the "Software").
 
-You may not: copy or distribute the software except for your own backup; sell, rent, lease, sublicense or share the software or its licence keys; modify, decompile, disassemble or reverse engineer it, or bypass its licence checks, except where the law expressly allows it; or remove copyright or licence notices.
+1. Ownership. The Software is proprietary. It is owned by Netbuild and protected by
+   copyright and other intellectual property laws. It is licensed, not sold.
 
-SKAEC.COM may revoke a licence if these terms are broken. Moving a licence to another computer requires a transfer from SKAEC.COM.
+2. Licence. Netbuild grants you a non-exclusive, non-transferable licence to install
+   and use the Software for your own work, on the terms under which you obtained it
+   from Netbuild or https://skaec.com (including any licence key, number of computers
+   and licence period).
 
-The software is provided "as is", without warranty of any kind. To the extent permitted by law, SKAEC.COM is not liable for any damages arising from its use, including loss of data or of work in Autodesk Revit models. Keep backups of your models.
+3. Restrictions. You may not: (a) copy the Software, except to install it and to keep
+   one backup; (b) sell, rent, lease, lend, sublicense, publish or otherwise
+   distribute the Software or its licence keys; (c) modify, adapt, decompile,
+   disassemble or reverse engineer the Software, or bypass or disable its licence
+   checks, except where the law expressly allows it; (d) remove or alter any
+   copyright, trademark or licence notice.
 
-Autodesk and Revit are registered trademarks of Autodesk, Inc. pyRevit, the Model Context Protocol SDK and other third-party components are used under their own licences. This product is not affiliated with or endorsed by Autodesk or Anthropic.
+4. Licence keys. Where the Software requires a licence key, the key is valid only for
+   the computer(s) and period it was issued for. Moving a licence to another computer
+   requires a transfer from Netbuild. Netbuild may revoke a licence key if this
+   agreement is breached.
+
+5. Termination. This licence ends automatically if you breach this agreement. You
+   must then stop using the Software and delete all copies.
+
+6. No warranty. The Software is provided "as is", without warranty of any kind,
+   express or implied, including fitness for a particular purpose. You are
+   responsible for checking its results and for keeping backups of your models and
+   files.
+
+7. Limitation of liability. To the extent permitted by law, Netbuild is not liable
+   for any indirect, incidental or consequential damages, or for loss of data, of
+   work in Autodesk Revit models, of profit or of business, arising from the use of
+   or inability to use the Software.
+
+8. Third parties. Autodesk and Revit are registered trademarks of Autodesk, Inc.
+   pyRevit, the Model Context Protocol SDK and other third-party components are used
+   under their own licences. Netbuild is not affiliated with or endorsed by Autodesk
+   or Anthropic.
 
 Contact: https://skaec.com
 """
@@ -1374,27 +1410,11 @@ def run_gui(collector, start_hidden=False):
         for b_txt in bullets:
             ttk.Label(ab, text="•  " + b_txt, wraplength=900, justify="left").pack(anchor="w", padx=(8, 0), pady=1)
     ttk.Separator(ab, orient="horizontal").pack(fill="x", pady=8)
-    # bottom row: licence status + contacts (left), the licence agreement text (right)
-    ab_low = ttk.Frame(ab)
-    ab_low.pack(fill="both", expand=True)
-    ab_info = ttk.Frame(ab_low)
-    ab_info.pack(side="left", fill="y", anchor="n", padx=(0, 12))
-    about_lic_var = tk.StringVar(value="Licence: checking…")      # same state as the Licence tab
-    ttk.Label(ab_info, textvariable=about_lic_var, wraplength=480, justify="left").pack(anchor="w")
-    ttk.Label(ab_info, text="Developer: %s  ·  %s" % (DEVELOPER_NAME, DEVELOPER_EMAIL)).pack(anchor="w", pady=(4, 0))
-    ttk.Label(ab_info, text=COPYRIGHT, style="Faint.TLabel").pack(anchor="w", pady=(4, 0))
-    about_btns = ttk.Frame(ab_info)
-    about_btns.pack(anchor="w", pady=(8, 0))
-    ttk.Button(about_btns, text="Open %s" % WEBSITE, command=lambda: __import__("webbrowser").open(WEBSITE)).pack(side="left")
-    ttk.Button(about_btns, text="Copy licence text", command=lambda: _copy_to_clipboard(root, LICENSE_TEXT)).pack(side="left", padx=6)
-    ab_txt = ttk.Frame(ab_low)
-    ab_txt.pack(side="left", fill="both", expand=True)
-    ttk.Label(ab_txt, text="Licence agreement (LICENSE.txt)", font=rt.FONTS["ui-heading"]).pack(anchor="w", pady=(0, 2))
-    lic_box = rt.console(ab_txt, wrap="word")
-    lic_box.configure(height=6)
-    lic_box.insert("1.0", LICENSE_TEXT)
-    lic_box.configure(state="disabled")
-    lic_box.pack(fill="both", expand=True)
+    ttk.Label(ab, text="Licence: %s -- see the Licence tab" % LICENSE_NAME).pack(anchor="w")
+    about_lic_var = tk.StringVar(value="Licence status: checking…")      # same state as the Licence tab
+    ttk.Label(ab, textvariable=about_lic_var, wraplength=900, justify="left").pack(anchor="w", pady=(4, 0))
+    ttk.Label(ab, text="Developer: %s  ·  %s" % (DEVELOPER_NAME, DEVELOPER_EMAIL)).pack(anchor="w", pady=(4, 0))
+    ttk.Label(ab, text=COPYRIGHT, style="Faint.TLabel").pack(anchor="w", pady=(4, 0))
 
     # -- Revit panel: one row per running Revit (port = pyRevit Routes listener) --
     top = ttk.LabelFrame(tab_status, text=" Revit Sessions  (one row per open Revit; click a row to switch to it) ", padding=(6, 4))
@@ -1593,9 +1613,20 @@ def run_gui(collector, start_hidden=False):
     setup_wrap(rtree, ("doc", "listener", "sessions"), "Revit.Treeview")
     setup_wrap(tree, ("session", "mcp", "doc", "folder"), "Sessions.Treeview")
 
-    # -- Licence tab (same layout as the Revit MCP Router Setup app) ------
-    lic = ttk.Frame(tab_lic, padding=(16, 10))
-    lic.pack(fill="both", expand=True)
+    # -- Licence tab: the licensing page (same layout as the Revit MCP Router Setup app) --
+    lic_page = ttk.Frame(tab_lic, padding=(16, 10))
+    lic_page.pack(fill="both", expand=True)
+    ttk.Label(lic_page, text="%s v%s" % (APP_DISPLAY, VERSION), font=rt.FONTS["ui-title"]).pack(anchor="w")
+    ttk.Label(lic_page, text="Proprietary software -- owned by %s   |   Website: %s" % (OWNER, WEBSITE)).pack(anchor="w")
+    ttk.Label(lic_page, text="Licence agreement: %s   |   %s" % (LICENSE_NAME, COPYRIGHT), style="Dim.TLabel").pack(anchor="w")
+    ttk.Label(lic_page, text="This software and its licence keys are the property of %s. Unauthorised use is prohibited." % OWNER,
+              style="Dim.TLabel", wraplength=900, justify="left").pack(anchor="w")
+    ttk.Separator(lic_page, orient="horizontal").pack(fill="x", pady=8)
+    # body: key status / activation / developer (left), the licence agreement text (right)
+    lic_body = ttk.Frame(lic_page)
+    lic_body.pack(fill="both", expand=True)
+    lic = ttk.Frame(lic_body)
+    lic.pack(side="left", fill="y", anchor="n", padx=(0, 16))
     lic_state_lbl = ttk.Label(lic, text="Checking licence…", font=rt.FONTS["ui-title"])
     lic_state_lbl.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 2))
     lic_detail_var = tk.StringVar(value="")
@@ -1614,7 +1645,7 @@ def run_gui(collector, start_hidden=False):
     ttk.Label(lic, text="Licence terms:").grid(row=5, column=0, sticky="nw", pady=3)
     ttk.Label(lic, text="Licensed for use on this computer only (the Machine ID above). Keys are issued per machine by the developer "
                         "and are not transferable. Redistribution, copying or reverse engineering of this software is prohibited. "
-                        "Full licence agreement: About tab (LICENSE.txt).",
+                        "Full licence agreement: on the right (LICENSE.txt).",
               wraplength=560, justify="left").grid(row=5, column=1, columnspan=2, sticky="w")
 
     ttk.Separator(lic, orient="horizontal").grid(row=6, column=0, columnspan=3, sticky="we", pady=8)
@@ -1631,9 +1662,21 @@ def run_gui(collector, start_hidden=False):
     lic_btns.grid(row=11, column=0, columnspan=3, sticky="w", pady=(4, 0))
     ttk.Button(lic_btns, text="Email developer", command=lambda: email_developer(root)).pack(side="left", padx=(0, 6))
 
-    ttk.Label(lic, text="This software and its licence keys are the property of %s. Unauthorised use is prohibited." % PUBLISHER,
-              style="Dim.TLabel", wraplength=700, justify="left").grid(row=12, column=0, columnspan=3, sticky="w", pady=(12, 0))
     lic.columnconfigure(1, weight=1)
+
+    lic_txt = ttk.Frame(lic_body)
+    lic_txt.pack(side="left", fill="both", expand=True)
+    ttk.Label(lic_txt, text="Licence agreement (LICENSE.txt)", font=rt.FONTS["ui-heading"]).pack(anchor="w", pady=(0, 2))
+    lic_txt_btns = ttk.Frame(lic_txt)
+    lic_txt_btns.pack(side="bottom", fill="x", pady=(6, 0))     # packed before the text box so it is never squeezed out
+    ttk.Button(lic_txt_btns, text="Copy licence",
+               command=lambda: (_copy_to_clipboard(root, LICENSE_TEXT), status_var.set("Licence copied"))).pack(side="left")
+    ttk.Button(lic_txt_btns, text="Open %s" % WEBSITE, command=lambda: __import__("webbrowser").open(WEBSITE)).pack(side="left", padx=6)
+    lic_box = rt.console(lic_txt, wrap="word")
+    lic_box.configure(height=6)
+    lic_box.insert("1.0", LICENSE_TEXT)
+    lic_box.configure(state="disabled")
+    lic_box.pack(fill="both", expand=True)
 
     # -- bottom bar (frame created above, before the table) --------------
     status_var = tk.StringVar(value="starting…")
@@ -1685,7 +1728,7 @@ def run_gui(collector, start_hidden=False):
         else:
             act_var.set("-")
         lic_foot_var.set("%s  ·  Machine ID %s" % (text, mid_now))
-        about_lic_var.set("Licence: %s  ·  Machine ID %s%s" % (text, mid_now, ("  ·  " + detail) if detail else ""))
+        about_lic_var.set("Licence status: %s  ·  Machine ID %s%s" % (text, mid_now, ("  ·  " + detail) if detail else ""))
 
     def refresh_licence():
         if lic_busy["on"]:

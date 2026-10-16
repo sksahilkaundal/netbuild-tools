@@ -23,12 +23,15 @@ never running a command on the wrong model.
   tray integration, licence expiry dates / subscription model.
 
 ## Changelog
-- **v1.3.7 (2026-10-16) — branding + licence.** Product name **Revit MCP Router by Netbuild**, publisher SKAEC.COM
-  (https://skaec.com), copyright `© 2026 SKAEC.COM. All rights reserved.` in titles, footer, licence dialog and README.txt.
-  New **About** tab in Setup (product, version, publisher, website, requirements, licence status, licence text);
-  proprietary `LICENSE.txt` ships next to the exes. Display-only change: `nb_license.PRODUCT` (part of the key
-  derivation), salts, product codes, file names and the sheet are unchanged — existing keys, passwords and activations
-  keep working (`router_branding_test.py` pins them). No routing change; the bridge's not-activated message now
+- **v1.3.7 (2026-10-16) — branding + licence.** Product name **Revit MCP Router by Netbuild**. Proprietary —
+  © 2026 Netbuild. All rights reserved. https://skaec.com — owner and publisher **Netbuild**, copyright
+  `© 2026 Netbuild. All rights reserved.` in titles, footer, licence dialog and README.txt. `LICENSE.txt` is the
+  **Netbuild Software Licence Agreement** (same file as the repository's root `LICENSE`) and ships next to the exes.
+  The **Licence** tab is the licensing page (product + version, owner, website, agreement name, key status /
+  activation as before, full agreement text with Copy licence / Open https://skaec.com); new **About** tab in Setup
+  (product, version, publisher, website, requirements, licence status); the Setup window opens at 1180x720.
+  Display-only change: `nb_license.PRODUCT` (part of the key derivation), salts, product codes, file names and
+  the sheet are unchanged — existing keys, passwords and activations keep working (`router_branding_test.py` pins them). No routing change; the bridge's not-activated message now
   names the product "Revit MCP Router by Netbuild".
 - **v1.3.6 (2026-10-02) — routing-identity fix + disconnect.** Field bug, reproduced twice on the developer PC:
   a session pinned with `pid:19540` (port 48884) kept routing after that Revit closed and a NEW Revit (pid 28568)

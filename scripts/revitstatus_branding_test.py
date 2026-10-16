@@ -3,8 +3,9 @@
 
     python revitstatus_branding_test.py   (or: python -m pytest revitstatus_branding_test.py)
 
-* product name, version, publisher, copyright, window title;
-* revitstatus_core.LICENSE_TEXT == RevitStatus_LICENSE.txt beside this file;
+* product name, version, owner, publisher, copyright, licence name, window title, Licence / About tabs;
+* revitstatus_core.LICENSE_TEXT == RevitStatus_LICENSE.txt beside this file == the repository's root LICENSE
+  (the Netbuild Software Licence Agreement);
 * every value existing licences depend on is UNCHANGED: salt, APP_TITLE (part of the key derivation),
   product code, file names and folders, the sheet / API URLs, the secret, and the outputs of
   password_hash / machine_key / _sign for fixed inputs (golden values from v1.2.3). If one of these
@@ -30,12 +31,16 @@ def test_product_strings():
     assert R.APP_DISPLAY == "Revit Status by Netbuild"
     assert R.VERSION == "1.2.4"
     assert R.WINDOW_TITLE == "Revit Status by Netbuild v1.2.4"
-    assert R.PUBLISHER == "SKAEC.COM"
+    assert R.OWNER == "Netbuild"
+    assert R.PUBLISHER == "Netbuild"
     assert R.WEBSITE == "https://skaec.com"
-    assert R.COPYRIGHT == u"© 2026 SKAEC.COM. All rights reserved."
+    assert R.COPYRIGHT == u"© 2026 Netbuild. All rights reserved."
+    assert R.LICENSE_NAME == "Netbuild Software Licence Agreement (proprietary)"
     assert R.DEVELOPER_EMAIL == "info@skaec.com"
     src = inspect.getsource(R.run_gui)
     assert "root.title(WINDOW_TITLE)" in src
+    assert "Proprietary software -- owned by %s   |   Website: %s" in src and "Copy licence" in src
+    assert "Licence: %s -- see the Licence tab" in src
     assert "FindWindowW(None, WINDOW_TITLE)" in inspect.getsource(R._single_instance_or_focus)
 
 
@@ -43,8 +48,13 @@ def test_license_text_equals_file():
     with open(os.path.join(HERE, "RevitStatus_LICENSE.txt"), encoding="utf-8") as fh:
         text = fh.read()
     assert R.LICENSE_TEXT == text, "revitstatus_core.LICENSE_TEXT differs from RevitStatus_LICENSE.txt"
-    assert text.startswith("Revit Status by Netbuild -- Licence Agreement\n")
-    assert "Copyright (c) 2026 SKAEC.COM. All rights reserved." in text
+    assert text.startswith("Netbuild Software Licence Agreement\n")
+    assert "Copyright (c) 2026 Netbuild. All rights reserved." in text
+    assert "Website: https://skaec.com" in text and "Revit Status by Netbuild" in text
+    with open(os.path.join(HERE, "..", "LICENSE"), encoding="utf-8") as fh:
+        assert fh.read() == text, "root LICENSE differs from RevitStatus_LICENSE.txt"
+    with open(os.path.join(HERE, "RevitMcpRouter", "LICENSE.txt"), encoding="utf-8") as fh:
+        assert fh.read() == text, "RevitMcpRouter/LICENSE.txt differs from RevitStatus_LICENSE.txt"
 
 
 def test_licence_constants_unchanged():

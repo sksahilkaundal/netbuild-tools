@@ -4,7 +4,7 @@ Lets one Claude Code session drive **any** of several open Revit instances (2023
 chosen per session, following a document across a Revit restart, refusing to guess when ambiguous.
 Licensed per PC. Shipped as native-compiled binaries — no Python source leaves this folder.
 
-Publisher: **SKAEC.COM** (https://skaec.com) · © 2026 SKAEC.COM. All rights reserved. · Proprietary — see [Licence](#licence).
+Proprietary — © 2026 Netbuild. All rights reserved. https://skaec.com · Owner and publisher: **Netbuild** · see [Licence](#licence).
 
 ## Files (this folder is PRIVATE — never ship it as a whole)
 
@@ -16,13 +16,13 @@ Publisher: **SKAEC.COM** (https://skaec.com) · © 2026 SKAEC.COM. All rights re
 | `nb_license.py` | licensing: Machine ID, per-machine HMAC keys, one-machine passwords, signed `license.json`, optional Google-Sheet allow-list | compiled → `.pyd` |
 | `install_revit_mcp_router.py` | install pipeline (CLI in source mode; module for the Setup app) | compiled → `.pyd` |
 | `revit_mcp_bridge.py` | 12-line entry stub → `RevitMcpBridge.exe` | stub only |
-| `setup_gui.py` | tkinter Setup app: **Setup** tab + **Licence** tab (status, Machine ID, developer name/email, terms, copyright) + **About** tab (product, version, publisher, website, requirements, licence status, licence text); `VERSION`, `REQUIREMENTS`, `LICENSE_TEXT` live here | compiled → `.pyd` |
+| `setup_gui.py` | tkinter Setup app: **Setup** tab + **Licence** tab = the licensing page (product, owner, website, agreement name, key status, Machine ID, activation, developer name/email, full agreement text with Copy licence / Open https://skaec.com) + **About** tab (product, version, publisher, website, requirements, licence status); `VERSION`, `REQUIREMENTS`, `LICENSE_TEXT` live here | compiled → `.pyd` |
 | `RevitMcpRouterSetup.pyw` | 10-line entry stub → `Revit MCP Router Setup.exe` | stub only |
 | `build_release.py` | **developer**: Nuitka(zig) compile → PyInstaller two-exe bundle → self-tests → `--deploy` | never |
 | `RevitMcpRouter_KeyGen.py` | **developer**: `--this-machine`, `--key <MID>`, `--hash <pw>`, `--new-password` | never |
 | `router_test.py` | 15-step end-to-end test (fake Revits); `ROUTER_TEST_BRIDGE=<.py or .exe>` | never |
-| `router_branding_test.py` | product name / About / `LICENSE_TEXT` == `LICENSE.txt`, and pins every licence-critical value (salts, product ids, key/hash outputs) so a rebrand cannot break existing keys; any OS | never |
-| `LICENSE.txt` | proprietary licence agreement (same text as the About tab) | copied next to the exes |
+| `router_branding_test.py` | product name / owner / About / `LICENSE_TEXT` == `LICENSE.txt` == root `LICENSE`, and pins every licence-critical value (salts, product ids, key/hash outputs) so a rebrand cannot break existing keys; any OS | never |
+| `LICENSE.txt` | Netbuild Software Licence Agreement (proprietary; same text as the Licence tab and the repository's root `LICENSE`) | copied next to the exes |
 | `extension_snapshot/` | Revit-side code of the pyRevit extension as installed (MIT upstream + our gate), with provenance | reference |
 | `PRODUCT_NOTES.md`, `RevitMcpRouter_PromptTemplate.md` | brief + prompts | never |
 | `legacy_in_extension_patch/` | v1.0 history | never |
@@ -42,8 +42,9 @@ Release output: `Portable\Revit MCP Router\` (+ `Portable\Revit MCP Router v<ver
   Setup window. Release build: Python 3.14.7 + Nuitka/zig + PyInstaller (see Build + release).
 
 ## Licence
-Proprietary — **Revit MCP Router by Netbuild**, © 2026 SKAEC.COM. All rights reserved. The licence agreement is
-`LICENSE.txt` (shipped next to the exes and shown on the Setup app's About tab; `setup_gui.LICENSE_TEXT` must equal it —
+Proprietary — © 2026 Netbuild. All rights reserved. https://skaec.com — **Revit MCP Router by Netbuild** is owned by
+Netbuild. The licence agreement is the **Netbuild Software Licence Agreement**,
+`LICENSE.txt` (shipped next to the exes and shown on the Setup app's Licence tab; `setup_gui.LICENSE_TEXT` must equal it —
 `router_branding_test.py` checks). `extension_snapshot/` is third-party MIT code and keeps its own `LICENSE`.
 
 ## How the product is protected

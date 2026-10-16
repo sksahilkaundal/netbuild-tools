@@ -41,9 +41,11 @@ def _rt():
 PRODUCT = "Revit MCP Router"          # part of the key derivation (_k2) and license.json - never change
 PRODUCT_CODE = "RMR"
 PRODUCT_DISPLAY = "Revit MCP Router by Netbuild"   # what the customer sees (titles, dialogs, About)
-PUBLISHER = "SKAEC.COM"
+OWNER = "Netbuild"                    # display only (licence screens, About, README.txt)
+PUBLISHER = "Netbuild"
 WEBSITE = "https://skaec.com"
-COPYRIGHT = "© 2026 SKAEC.COM. All rights reserved."
+COPYRIGHT = "© 2026 Netbuild. All rights reserved."   # informational in license.json; never validated
+LICENSE_NAME = "Netbuild Software Licence Agreement (proprietary)"   # LICENSE.txt
 DEVELOPER_NAME = "Sahil Kaundal (Netbuild2026)"
 DEVELOPER_EMAIL = "info@skaec.com"
 
