@@ -1,14 +1,15 @@
-"""Tkinter window: Run tab (model-by-model export pass) and Setup tab (link local paths)."""
+"""Tkinter window: Run tab (model-by-model export pass), Setup tab (link local paths) and About tab."""
 
 import os
 import queue
 import threading
 import time
 import tkinter as tk
+import webbrowser
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 
-from . import __version__
+from . import about
 from .runner import MODE_LABELS, Job, Runner, log_time_saved, open_folder, static_checks, today
 from .settings import SCRIPT_KEYS, Settings
 from .sheets import SheetSpecError, parse_sheet_spec
@@ -160,16 +161,18 @@ class App(object):
         self.rows = []          # files verified this session
         self.state = {}         # model name -> column values
 
-        root.title("ProjectA Plot GA Export Runner %s" % __version__)
+        root.title(about.title())
         root.geometry("1180x860")
         root.minsize(980, 640)
         nb = ttk.Notebook(root)
         nb.pack(fill="both", expand=True)
-        self.run_tab, self.setup_tab = ttk.Frame(nb), ttk.Frame(nb)
+        self.run_tab, self.setup_tab, self.about_tab = ttk.Frame(nb), ttk.Frame(nb), ttk.Frame(nb)
         nb.add(self.run_tab, text="  Run  ")
         nb.add(self.setup_tab, text="  Setup / Paths  ")
+        nb.add(self.about_tab, text="  About  ")
         self._build_run_tab()
         self._build_setup_tab()
+        self._build_about_tab()
         self.status = tk.StringVar(value="Open the first model in Revit, select it below, then click "
                                          "'Model is open'.")
         ttk.Label(root, textvariable=self.status, anchor="w", relief="sunken").pack(fill="x")
@@ -374,6 +377,39 @@ class App(object):
             "in memory per call. Revit needs pyRevit + the MCP listener (the same one Claude uses).")
         ).pack(anchor="w", **PAD)
         self._check_paths()
+
+    # ------------------------------------------------------------ About tab
+    def _build_about_tab(self):
+        f = ttk.Frame(self.about_tab)
+        f.pack(fill="both", expand=True, padx=14, pady=10)
+        ttk.Label(f, text=about.PRODUCT, font=("Segoe UI", 16, "bold")).pack(anchor="w")
+        ttk.Label(f, text="Version %s   |   %s   |   %s" % (about.VERSION, about.COPYRIGHT, about.WEBSITE),
+                  foreground="#555").pack(anchor="w", pady=(2, 8))
+        ttk.Label(f, text=about.DESCRIPTION, wraplength=1000, justify="left").pack(anchor="w", pady=(0, 8))
+        cols = ttk.Frame(f)
+        cols.pack(fill="x")
+        left, right = ttk.LabelFrame(cols, text="Features"), ttk.LabelFrame(cols, text="Requirements")
+        left.pack(side="left", fill="both", expand=True, padx=(0, 6))
+        right.pack(side="left", fill="both", expand=True)
+        ttk.Label(left, justify="left", wraplength=480,
+                  text="\n".join("- " + x for x in about.FEATURES)).pack(anchor="w", **PAD)
+        ttk.Label(right, justify="left", wraplength=480, text=about.requirements_text()).pack(anchor="w", **PAD)
+        lf = ttk.LabelFrame(f, text="License -- %s" % about.LICENSE_NAME)
+        lf.pack(fill="both", expand=True, pady=(8, 0))
+        self.license_box = ScrolledText(lf, height=12, wrap="word", font=("Consolas", 9))
+        self.license_box.insert("1.0", about.LICENSE_TEXT)
+        self.license_box.config(state="disabled")
+        self.license_box.pack(fill="both", expand=True)
+        bar = ttk.Frame(f)
+        bar.pack(fill="x", pady=(8, 0))
+        ttk.Button(bar, text="Copy product info", command=self._copy_about).pack(side="left", **PAD)
+        ttk.Button(bar, text="Open %s" % about.WEBSITE,
+                   command=lambda: webbrowser.open(about.WEBSITE)).pack(side="left", **PAD)
+
+    def _copy_about(self):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(about.about_text())
+        self.status.set("Product info, requirements and license copied to the clipboard.")
 
     def _browse(self, key, kind):
         cur = self.path_vars[key].get()

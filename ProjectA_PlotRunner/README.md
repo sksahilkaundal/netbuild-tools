@@ -1,7 +1,9 @@
-# ProjectA Plot GA Export Runner (portable)
+# Plot Runner by Netbuild
 
-A desktop window and command line for the **ProjectA Plot GA export pass**, model by model, using your
-existing export scripts:
+© 2026 [SKAEC.COM](https://skaec.com) · MIT License · see **About** below
+
+A portable desktop window and command line for the **ProjectA Plot GA export pass**, model by model, using
+your existing export scripts:
 
 | Script | Model | Routing |
 |---|---|---|
@@ -46,9 +48,11 @@ set to *Stop*, the runner says so. No Python is needed for the exe.
 
 ## Install (portable, no installer)
 
-1. Download `ProjectA_PlotRunner-windows` from **Actions → Build ProjectA Plot Runner (Windows exe)**. It holds:
-   - `ProjectA_PlotRunner.exe`: the window.
+1. Download `PlotRunner-by-Netbuild-windows` from **Actions → Build Plot Runner by Netbuild (Windows)**.
+   It holds:
+   - `Plot Runner by Netbuild.exe`: the window.
    - `ProjectAPlot.exe`: the command line.
+   - `LICENSE` and this README.
 
    Put them in any folder. `settings.json` and `logs\` are created next to them.
    - Or run from source with `ProjectA_PlotRunner.bat` (Python 3.9+ with tkinter), or build the exes
@@ -135,6 +139,8 @@ ProjectAPlot run --date 06-Sep-2026 --mode pdf+cad      :: the full pass: SW00, 
                                                    :: waits for "Enter when <model> is open" (s skip, q quit)
 ProjectAPlot verify --mode pdf+cad
 ProjectAPlot log-time --actual 35 --sheets 120
+ProjectAPlot about                                      :: product info, requirements and license
+ProjectAPlot --version
 ```
 
 `--out YYYYMMDD` defaults to today. `--allow-missing` exports the listed sheets that were found even
@@ -165,4 +171,35 @@ The tests run copies of the real export scripts (`tests\fixtures\`) against a st
 - stall → one-sheet fallback, and stale replies;
 - an old file that was not rewritten;
 - paused and unreachable Revit;
-- the CLI, and the window.
+- the CLI, and the window;
+- the About text, the license and the exe version resource.
+
+## About
+
+Every entry point has an About screen with the product name, version, publisher, requirements and
+the full license text:
+- the **About** tab in the window;
+- `ProjectAPlot about` on the command line (`ProjectAPlot --version` prints the version).
+
+The exes also carry this in **Properties → Details**:
+- Company: SKAEC.COM;
+- Product: Plot Runner by Netbuild;
+- the version;
+- Copyright: (c) 2026 SKAEC.COM.
+
+All of it comes from one file, `projecta_plot/about.py`.
+
+### Requirements
+
+| To run | You need |
+|---|---|
+| **Plot Runner by Netbuild.exe** / **ProjectAPlot.exe** | Windows 10 / 11 64-bit, no Python needed |
+| From source (`ProjectA_PlotRunner.bat`, `ProjectAPlot.bat`) | Python 3.9 or later with tkinter |
+| Revit | Autodesk Revit 2022 or later (the export scripts use Revit's PDF export, `PDFExportOptions`) · pyRevit with its IronPython engine (the scripts and the runner's additions are IronPython 2.7) · the Revit MCP extension, its listener running (MCP Status on) at `http://127.0.0.1:48884` |
+| Export scripts | `export_master_ga_sheets_by_browser_filter.py` and `export_podium_sheets_by_revision.py`, linked on **Setup / Paths** (default `<Netbuild folder>\scripts\`) |
+| The models | The ProjectA model being exported open in Revit (any window may be active; each call binds by title) |
+
+### License
+
+MIT License. Copyright (c) 2026 SKAEC.COM. The full text is in [`LICENSE`](../LICENSE), shipped
+next to the exes.

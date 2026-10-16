@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 
+from . import about
 from .runner import MODES, Job, Runner, Aborted, log_time_saved, static_checks, today
 from .settings import DEFAULTS, SCRIPT_KEYS, Settings
 from .sheets import SheetSpecError
@@ -37,8 +38,11 @@ def _job(a, s):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="ProjectAPlot", description="ProjectA Plot GA export runner (talks to Revit "
-                                 "through the pyRevit MCP listener; your export scripts are never edited)")
+    ap = argparse.ArgumentParser(prog="ProjectAPlot", description=(
+        "%s %s -- the ProjectA Plot GA export pass, model by model (talks to Revit through the pyRevit MCP "
+        "listener; your export scripts are never edited)" % (about.PRODUCT, about.VERSION)),
+        epilog="%s  |  %s  |  %s (ProjectAPlot about)" % (about.COPYRIGHT, about.WEBSITE, about.LICENSE_NAME))
+    ap.add_argument("--version", action="version", version="%s %s" % (about.PRODUCT, about.VERSION))
     sub = ap.add_subparsers(dest="cmd")
 
     st = sub.add_parser("setup", help="show / link the local paths and check both export scripts")
@@ -80,8 +84,14 @@ def main(argv=None):
     t.add_argument("--manual", type=float, help="minutes the manual process takes")
     t.add_argument("--notes", default="")
     sub.add_parser("gui", help="open the window (default)")
+    sub.add_parser("about", help="product info, requirements and license")
 
     a = ap.parse_args(argv)
+    if a.cmd == "about":
+        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+        print(about.about_text().encode(enc, "replace").decode(enc))     # a console without the (c) sign
+        return 0
+
     s = Settings()
 
     if a.cmd in (None, "gui"):

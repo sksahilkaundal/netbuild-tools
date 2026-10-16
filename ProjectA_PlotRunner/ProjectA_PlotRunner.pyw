@@ -1,4 +1,4 @@
-"""Window entry point (double-click, or ProjectA_PlotRunner.bat)."""
+"""Window entry point of Plot Runner by Netbuild (double-click, or ProjectA_PlotRunner.bat)."""
 import os
 import sys
 

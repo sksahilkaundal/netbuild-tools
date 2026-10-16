@@ -1,5 +1,5 @@
 @echo off
-rem Double-click to open the ProjectA Plot GA Export Runner window.
+rem Double-click to open the Plot Runner by Netbuild window.
 setlocal
 cd /d "%~dp0"
 where pyw >nul 2>nul

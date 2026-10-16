@@ -1,5 +1,5 @@
 @echo off
-rem Command line:  ProjectAPlot setup | models | check | dry | export | run | verify | log-time   (-h for help)
+rem Command line:  ProjectAPlot setup | models | check | dry | export | run | verify | log-time | about   (-h for help)
 setlocal
 set "HERE=%~dp0"
 set "PYTHONPATH=%HERE%;%PYTHONPATH%"

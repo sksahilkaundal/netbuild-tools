@@ -23,7 +23,7 @@ with open(settings, "w") as f:
 
 failed = False
 try:
-    for args in (["setup"], ["models"], ["check", "SW00"],
+    for args in (["--version"], ["about"], ["setup"], ["models"], ["check", "SW00"],
                  ["export", "SW00", "--date", "06-Sep-2026", "--out", "20261015", "--mode", "pdf+cad"],
                  ["export", "B001", "--date", "06/09/2026", "--out", "20261015", "--mode", "pdf+cad",
                   "--sheets", "210001 to 210003, 230001"],
