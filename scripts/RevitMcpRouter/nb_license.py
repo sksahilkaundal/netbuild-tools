@@ -38,9 +38,12 @@ def _rt():
         import revittools_theme as rt
     return rt
 
-PRODUCT = "Revit MCP Router"
+PRODUCT = "Revit MCP Router"          # part of the key derivation (_k2) and license.json - never change
 PRODUCT_CODE = "RMR"
-COPYRIGHT = "© Netbuild2026 · All rights reserved"
+PRODUCT_DISPLAY = "Revit MCP Router by Netbuild"   # what the customer sees (titles, dialogs, About)
+PUBLISHER = "SKAEC.COM"
+WEBSITE = "https://skaec.com"
+COPYRIGHT = "© 2026 SKAEC.COM. All rights reserved."
 DEVELOPER_NAME = "Sahil Kaundal (Netbuild2026)"
 DEVELOPER_EMAIL = "info@skaec.com"
 
@@ -408,7 +411,7 @@ def status_text():
 
 def unlicensed_message():
     return ("%s is not activated on this PC (Machine ID %s). Run 'Revit MCP Router Setup' and enter your "
-            "password or key, or email %s with the Machine ID." % (PRODUCT, machine_id(), DEVELOPER_EMAIL))
+            "password or key, or email %s with the Machine ID." % (PRODUCT_DISPLAY, machine_id(), DEVELOPER_EMAIL))
 
 
 # ----------------------------------------------------------------------------
@@ -436,7 +439,7 @@ def activation_dialog(parent=None, state=None):
     rt = _rt()
     win = tk.Toplevel(root)
     rt.on_change(win, lambda p: win.configure(background=p["surface"]))
-    win.title("%s - Licence" % PRODUCT)
+    win.title("%s - Licence" % PRODUCT_DISPLAY)
     win.resizable(False, False)
     result = {"ok": False}
     reason = {
@@ -449,7 +452,7 @@ def activation_dialog(parent=None, state=None):
     }.get(state, state)
     frm = ttk.Frame(win, padding=14)
     frm.pack(fill="both", expand=True)
-    ttk.Label(frm, text=PRODUCT, font=(rt.UI, 12, "bold")).grid(row=0, column=0, columnspan=3, sticky="w")
+    ttk.Label(frm, text=PRODUCT_DISPLAY, font=(rt.UI, 12, "bold")).grid(row=0, column=0, columnspan=3, sticky="w")
     ttk.Label(frm, text=reason, wraplength=420).grid(row=1, column=0, columnspan=3, sticky="w", pady=(4, 8))
     ttk.Label(frm, text="Machine ID:").grid(row=2, column=0, sticky="w")
     mid_var = tk.StringVar(value=mid)
@@ -481,11 +484,11 @@ def activation_dialog(parent=None, state=None):
     def mail():
         import webbrowser
         from urllib.parse import quote
-        webbrowser.open("mailto:%s?subject=%s&body=%s" % (DEVELOPER_EMAIL, quote("%s licence - Machine ID %s" % (PRODUCT, mid)),
-                                                          quote("Product: %s\nMachine ID: %s\n" % (PRODUCT, mid))))
+        webbrowser.open("mailto:%s?subject=%s&body=%s" % (DEVELOPER_EMAIL, quote("%s licence - Machine ID %s" % (PRODUCT_DISPLAY, mid)),
+                                                          quote("Product: %s\nMachine ID: %s\n" % (PRODUCT_DISPLAY, mid))))
     ttk.Button(btns, text="Email developer", command=mail).pack(side="right", padx=4)
     ttk.Button(btns, text="Close" if state == "ok" else "Quit", command=win.destroy).pack(side="right", padx=4)
-    ttk.Label(frm, text="%s \u00b7 %s" % (DEVELOPER_NAME, DEVELOPER_EMAIL), style="Dim.TLabel").grid(row=6, column=0, columnspan=3, sticky="w", pady=(10, 0))
+    ttk.Label(frm, text="%s \u00b7 %s \u00b7 %s" % (PUBLISHER, DEVELOPER_NAME, DEVELOPER_EMAIL), style="Dim.TLabel").grid(row=6, column=0, columnspan=3, sticky="w", pady=(10, 0))
     ttk.Label(frm, text=COPYRIGHT, style="Faint.TLabel").grid(row=7, column=0, columnspan=3, sticky="w")
     win.update_idletasks()
     w, h = win.winfo_reqwidth(), win.winfo_reqheight()

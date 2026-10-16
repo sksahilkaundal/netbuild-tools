@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Revit Status
-============
+Revit Status by Netbuild
+========================
 Small always-available window + system-tray icon that shows, live:
 
   * every running Revit (pyRevit Routes listener on 48884, 48885, ...): version,
@@ -77,15 +77,19 @@ LINK_FMT = "claude://claude.ai/epitaxy/{host}"
 POLL_PROC_S = 2.0      # process scan interval
 POLL_HTTP_S = 3.0      # Revit listener poll interval
 HTTP_TIMEOUT_S = 1.5   # per port; probes run in parallel (a closed port costs the full timeout)
-APP_TITLE = "Revit Status"
-VERSION = "1.2.3"
+APP_TITLE = "Revit Status"        # part of the key derivation (_k2) and license.json - never change
+VERSION = "1.2.4"
+APP_DISPLAY = "Revit Status by Netbuild"           # product name shown to the customer
+WINDOW_TITLE = "%s v%s" % (APP_DISPLAY, VERSION)  # main window (also found by title by a second launch)
+PUBLISHER = "SKAEC.COM"
+WEBSITE = "https://skaec.com"
 # This module is compiled to a native .pyd for release (build_revitstatus_release.py);
 # RevitStatus.pyw is only a 10-line stub that calls main().
 MUTEX_NAME = "Local\\RevitStatusApp.SingleInstance"
 SHOW_EVENT_NAME = "Local\\RevitStatusApp.Show"
 
 # ------------------------------------------------------------- licensing ---
-COPYRIGHT = "© Netbuild2026 · All rights reserved"
+COPYRIGHT = "© 2026 SKAEC.COM. All rights reserved."
 DEVELOPER_NAME = "Sahil Kaundal (Netbuild2026)"
 DEVELOPER_EMAIL = "info@skaec.com"
 LICENSE_FILE = "license.json"
@@ -703,7 +707,7 @@ def _single_instance_or_focus():
         if not _signal_show_event(k32):
             # fallback: poke the window directly
             u32 = ctypes.windll.user32
-            hwnd = u32.FindWindowW(None, APP_TITLE)
+            hwnd = u32.FindWindowW(None, WINDOW_TITLE)
             if hwnd:
                 u32.ShowWindow(hwnd, 9)  # SW_RESTORE
                 u32.SetForegroundWindow(hwnd)
@@ -1095,9 +1099,9 @@ def email_developer(root=None):
     """Open a pre-filled licence-request email; falls back to copying the Machine ID."""
     import urllib.parse
     mid = machine_id()
-    subject = "%s licence - Machine ID %s" % (APP_TITLE, mid)
+    subject = "%s licence - Machine ID %s" % (APP_DISPLAY, mid)
     body = ("Hello,\n\nProduct: %s v%s\nMachine ID: %s\nComputer: %s\n\nPlease issue a key for this machine.\n\nThanks."
-            % (APP_TITLE, VERSION, mid, __import__("socket").gethostname()))
+            % (APP_DISPLAY, VERSION, mid, __import__("socket").gethostname()))
     try:
         os.startfile("mailto:%s?subject=%s&body=%s" % (DEVELOPER_EMAIL, urllib.parse.quote(subject), urllib.parse.quote(body)))
     except Exception:
@@ -1114,7 +1118,7 @@ def activation_dialog(root):
     result = {"ok": False}
     dlg = tk.Toplevel(root)
     rt.on_change(dlg, lambda p: dlg.configure(background=p["surface"]))
-    dlg.title("%s - Activation" % APP_TITLE)
+    dlg.title("%s - Activation" % APP_DISPLAY)
     dlg.resizable(False, False)
     if root.winfo_viewable():
         dlg.transient(root)   # a transient of a withdrawn root is never shown (Tk): the start-up gate's root is withdrawn
@@ -1188,7 +1192,7 @@ def ensure_activated():
 
     def locked_dialog(other_act):
         dlg = tk.Toplevel(root)
-        dlg.title("%s - Licence" % APP_TITLE)
+        dlg.title("%s - Licence" % APP_DISPLAY)
         dlg.resizable(False, False)
         frm = ttk.Frame(dlg, padding=(18, 14))
         frm.pack(fill="both", expand=True)
@@ -1219,7 +1223,7 @@ def ensure_activated():
 
     def simple_lock(title_text, body_text):
         dlg = tk.Toplevel(root)
-        dlg.title("%s - Licence" % APP_TITLE)
+        dlg.title("%s - Licence" % APP_DISPLAY)
         dlg.resizable(False, False)
         frm = ttk.Frame(dlg, padding=(18, 14))
         frm.pack(fill="both", expand=True)
@@ -1269,6 +1273,25 @@ def ensure_activated():
 
 
 # ------------------------------------------------------------------- UI ---
+# Same text as RevitStatus_LICENSE.txt beside this file (revitstatus_branding_test.py checks it).
+LICENSE_TEXT = """Revit Status by Netbuild -- Licence Agreement
+
+Copyright (c) 2026 SKAEC.COM. All rights reserved.
+
+This software is licensed, not sold. SKAEC.COM grants you a non-exclusive, non-transferable licence to install and use this software on the computer(s) for which a valid licence was issued, for the term of that licence.
+
+You may not: copy or distribute the software except for your own backup; sell, rent, lease, sublicense or share the software or its licence keys; modify, decompile, disassemble or reverse engineer it, or bypass its licence checks, except where the law expressly allows it; or remove copyright or licence notices.
+
+SKAEC.COM may revoke a licence if these terms are broken. Moving a licence to another computer requires a transfer from SKAEC.COM.
+
+The software is provided "as is", without warranty of any kind. To the extent permitted by law, SKAEC.COM is not liable for any damages arising from its use, including loss of data or of work in Autodesk Revit models. Keep backups of your models.
+
+Autodesk and Revit are registered trademarks of Autodesk, Inc. pyRevit, the Model Context Protocol SDK and other third-party components are used under their own licences. This product is not affiliated with or endorsed by Autodesk or Anthropic.
+
+Contact: https://skaec.com
+"""
+
+
 def run_gui(collector, start_hidden=False):
     import tkinter as tk
     from tkinter import ttk
@@ -1284,7 +1307,7 @@ def run_gui(collector, start_hidden=False):
     root = tk.Tk()
     if start_hidden:
         root.withdraw()          # never flash the window when launched at login
-    root.title(APP_TITLE)
+    root.title(WINDOW_TITLE)
     root.geometry("1180x720")
     root.minsize(760, 420)
 
@@ -1297,7 +1320,7 @@ def run_gui(collector, start_hidden=False):
     # remaining space.
     foot = ttk.Frame(root, padding=(10, 0, 10, 6))
     foot.pack(side="bottom", fill="x")
-    ttk.Label(foot, text="%s v%s   %s" % (APP_TITLE, VERSION, COPYRIGHT), style="Faint.TLabel").pack(side="left")
+    ttk.Label(foot, text="%s v%s   %s" % (APP_DISPLAY, VERSION, COPYRIGHT), style="Faint.TLabel").pack(side="left")
     lic_foot_var = tk.StringVar(value="Machine ID %s" % machine_id())
     ttk.Label(foot, textvariable=lic_foot_var, style="FaintMono.TLabel").pack(side="right")
     bar = ttk.Frame(root, padding=(10, 4))
@@ -1316,7 +1339,9 @@ def run_gui(collector, start_hidden=False):
     # -- About tab: what the app does and what it needs ------------------
     ab = ttk.Frame(tab_about, padding=(16, 10))
     ab.pack(fill="both", expand=True)
-    ttk.Label(ab, text="%s  v%s" % (APP_TITLE, VERSION), font=rt.FONTS["ui-title"]).pack(anchor="w")
+    ttk.Label(ab, text="%s v%s" % (APP_DISPLAY, VERSION), font=rt.FONTS["ui-title"]).pack(anchor="w")
+    ttk.Label(ab, text="Publisher: %s   |   %s   |   %s" % (PUBLISHER, WEBSITE, COPYRIGHT),
+              style="Dim.TLabel").pack(anchor="w")
     ttk.Label(ab, text="A system-tray monitor that shows every open Revit and every Claude Code session on this "
                        "computer, and which Revit each session is talking to.",
               style="Dim.TLabel", wraplength=900, justify="left").pack(anchor="w", pady=(2, 12))
@@ -1329,27 +1354,47 @@ def run_gui(collector, start_hidden=False):
             "Click a Revit row to switch to that Revit (skipped when Revit is not responding, so a stuck Revit is never "
             "disturbed). Click a session row to open it in the Claude app. Click a column heading to sort; double-click "
             "a heading divider to fit the column.",
-            "Runs in the system tray and starts at Windows login. Icon colour: green = connected, amber = Revit reachable "
-            "but no document or bridge, red = no Revit reachable.",
+            "Runs in the system tray (a Startup-folder shortcut with --tray starts it at Windows login). Icon colour: "
+            "green = connected, amber = Revit reachable but no document or bridge, red = no Revit reachable.",
         )),
         ("Requirements", (
             "Windows 10 or 11 (64-bit). No installation, no admin rights and no Python needed: keep the "
             "\"Revit Status\" folder together.",
             "Autodesk Revit 2023-2026 with pyRevit and the Revit MCP connector loaded (it provides the status "
-            "listener on port 48884 and up).",
+            "listener on port 48884 and up). The app reads whatever Revit pyRevit registers; it does not check the version.",
             "Claude Code (desktop app) for the Code Sessions list and session links.",
             "Optional: Revit MCP Router, to route each Claude session to a chosen Revit.",
-            "An internet connection at start-up for the licence check; it keeps working offline for up to %d days "
-            "after the last check. One licence per computer." % LICENSE_CACHE_GRACE_DAYS,
+            "An internet connection to activate, and at start-up for the licence check; it keeps working offline for "
+            "up to %d days after the last successful check. One licence per computer (Machine ID)." % LICENSE_CACHE_GRACE_DAYS,
+            "From source instead of the .exe (developer only): Python 3 with tkinter, psutil, pystray and Pillow.",
         )),
     )
     for head, bullets in about_sections:
         ttk.Label(ab, text=head, font=rt.FONTS["ui-heading"]).pack(anchor="w", pady=(4, 2))
         for b_txt in bullets:
             ttk.Label(ab, text="•  " + b_txt, wraplength=900, justify="left").pack(anchor="w", padx=(8, 0), pady=1)
-    ttk.Separator(ab, orient="horizontal").pack(fill="x", pady=12)
-    ttk.Label(ab, text="Developer: %s  ·  %s" % (DEVELOPER_NAME, DEVELOPER_EMAIL)).pack(anchor="w")
-    ttk.Label(ab, text=COPYRIGHT, style="Faint.TLabel").pack(anchor="w", pady=(4, 0))
+    ttk.Separator(ab, orient="horizontal").pack(fill="x", pady=8)
+    # bottom row: licence status + contacts (left), the licence agreement text (right)
+    ab_low = ttk.Frame(ab)
+    ab_low.pack(fill="both", expand=True)
+    ab_info = ttk.Frame(ab_low)
+    ab_info.pack(side="left", fill="y", anchor="n", padx=(0, 12))
+    about_lic_var = tk.StringVar(value="Licence: checking…")      # same state as the Licence tab
+    ttk.Label(ab_info, textvariable=about_lic_var, wraplength=480, justify="left").pack(anchor="w")
+    ttk.Label(ab_info, text="Developer: %s  ·  %s" % (DEVELOPER_NAME, DEVELOPER_EMAIL)).pack(anchor="w", pady=(4, 0))
+    ttk.Label(ab_info, text=COPYRIGHT, style="Faint.TLabel").pack(anchor="w", pady=(4, 0))
+    about_btns = ttk.Frame(ab_info)
+    about_btns.pack(anchor="w", pady=(8, 0))
+    ttk.Button(about_btns, text="Open %s" % WEBSITE, command=lambda: __import__("webbrowser").open(WEBSITE)).pack(side="left")
+    ttk.Button(about_btns, text="Copy licence text", command=lambda: _copy_to_clipboard(root, LICENSE_TEXT)).pack(side="left", padx=6)
+    ab_txt = ttk.Frame(ab_low)
+    ab_txt.pack(side="left", fill="both", expand=True)
+    ttk.Label(ab_txt, text="Licence agreement (LICENSE.txt)", font=rt.FONTS["ui-heading"]).pack(anchor="w", pady=(0, 2))
+    lic_box = rt.console(ab_txt, wrap="word")
+    lic_box.configure(height=6)
+    lic_box.insert("1.0", LICENSE_TEXT)
+    lic_box.configure(state="disabled")
+    lic_box.pack(fill="both", expand=True)
 
     # -- Revit panel: one row per running Revit (port = pyRevit Routes listener) --
     top = ttk.LabelFrame(tab_status, text=" Revit Sessions  (one row per open Revit; click a row to switch to it) ", padding=(6, 4))
@@ -1568,7 +1613,8 @@ def run_gui(collector, start_hidden=False):
     ttk.Label(lic, textvariable=act_var).grid(row=4, column=1, columnspan=2, sticky="w")
     ttk.Label(lic, text="Licence terms:").grid(row=5, column=0, sticky="nw", pady=3)
     ttk.Label(lic, text="Licensed for use on this computer only (the Machine ID above). Keys are issued per machine by the developer "
-                        "and are not transferable. Redistribution, copying or reverse engineering of this software is prohibited.",
+                        "and are not transferable. Redistribution, copying or reverse engineering of this software is prohibited. "
+                        "Full licence agreement: About tab (LICENSE.txt).",
               wraplength=560, justify="left").grid(row=5, column=1, columnspan=2, sticky="w")
 
     ttk.Separator(lic, orient="horizontal").grid(row=6, column=0, columnspan=3, sticky="we", pady=8)
@@ -1585,7 +1631,7 @@ def run_gui(collector, start_hidden=False):
     lic_btns.grid(row=11, column=0, columnspan=3, sticky="w", pady=(4, 0))
     ttk.Button(lic_btns, text="Email developer", command=lambda: email_developer(root)).pack(side="left", padx=(0, 6))
 
-    ttk.Label(lic, text="This software and its licence keys are the property of the developer. Unauthorised use is prohibited.",
+    ttk.Label(lic, text="This software and its licence keys are the property of %s. Unauthorised use is prohibited." % PUBLISHER,
               style="Dim.TLabel", wraplength=700, justify="left").grid(row=12, column=0, columnspan=3, sticky="w", pady=(12, 0))
     lic.columnconfigure(1, weight=1)
 
@@ -1639,6 +1685,7 @@ def run_gui(collector, start_hidden=False):
         else:
             act_var.set("-")
         lic_foot_var.set("%s  ·  Machine ID %s" % (text, mid_now))
+        about_lic_var.set("Licence: %s  ·  Machine ID %s%s" % (text, mid_now, ("  ·  " + detail) if detail else ""))
 
     def refresh_licence():
         if lic_busy["on"]:

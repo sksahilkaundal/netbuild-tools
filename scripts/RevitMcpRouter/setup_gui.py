@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Revit MCP Router - Setup desktop app (compiled to a .pyd for release; RevitMcpRouterSetup.pyw is the stub).
 
-Tabs: Setup (check / install / restore / find Revits) and Licence (status, Machine ID,
-developer contact, copyright). No implementation details are shown to the customer.
+Tabs: Setup (check / install / restore / find Revits), Licence (status, Machine ID,
+developer contact, copyright) and About (product, publisher, requirements, licence text).
+No implementation details are shown to the customer.
 """
 import os
 import queue
@@ -16,10 +17,44 @@ from tkinter import filedialog, messagebox, ttk
 import install_revit_mcp_router as inst
 import nb_license
 
-APP = "Revit MCP Router"
-VERSION = "1.3.6"
+APP = nb_license.PRODUCT_DISPLAY      # "Revit MCP Router by Netbuild" (display only; paths use their own names)
+VERSION = "1.3.7"
 FROZEN = getattr(sys, "frozen", False)
 APP_DIR = os.path.dirname(sys.executable) if FROZEN else os.path.dirname(os.path.abspath(__file__))
+
+DESCRIPTION = ("Lets Claude Code (or another MCP client) drive any of several open Revit sessions on this computer, "
+               "chosen per chat session by document, Revit version or port. It follows a document across a Revit "
+               "restart and refuses to guess when the choice is ambiguous, so a command never runs on the wrong model.")
+
+REQUIREMENTS = (
+    "Windows 10 or 11 (64-bit). No admin rights and no Python needed for the app.",
+    "Autodesk Revit 2023-2026 (several can be open side by side), each with pyRevit and the Revit MCP connector "
+    "extension (mcp-server-for-revit-python) loaded; pyRevit's Routes server gives every Revit a port from 48884 up.",
+    "Claude Code: Install / Reset connects it through ~/.claude.json (and Codex through ~/.codex/config.toml when "
+    "Codex is installed). Other MCP clients can start RevitMcpBridge.exe as a stdio server.",
+    "An internet connection to activate, and at every start of the bridge for the licence check; it keeps working "
+    "offline for up to %d days after the last successful check. One licence per computer (Machine ID)." % nb_license.LICENSE_CACHE_GRACE_DAYS,
+    "From source instead of the .exe files (developer only): Python 3.10 or later with mcp[cli]<2 and httpx "
+    "(tkinter for the Setup window).",
+)
+
+# Same text as LICENSE.txt beside this file (router_branding_test.py checks it).
+LICENSE_TEXT = """Revit MCP Router by Netbuild -- Licence Agreement
+
+Copyright (c) 2026 SKAEC.COM. All rights reserved.
+
+This software is licensed, not sold. SKAEC.COM grants you a non-exclusive, non-transferable licence to install and use this software on the computer(s) for which a valid licence was issued, for the term of that licence.
+
+You may not: copy or distribute the software except for your own backup; sell, rent, lease, sublicense or share the software or its licence keys; modify, decompile, disassemble or reverse engineer it, or bypass its licence checks, except where the law expressly allows it; or remove copyright or licence notices.
+
+SKAEC.COM may revoke a licence if these terms are broken. Moving a licence to another computer requires a transfer from SKAEC.COM.
+
+The software is provided "as is", without warranty of any kind. To the extent permitted by law, SKAEC.COM is not liable for any damages arising from its use, including loss of data or of work in Autodesk Revit models. Keep backups of your models.
+
+Autodesk and Revit are registered trademarks of Autodesk, Inc. pyRevit, the Model Context Protocol SDK and other third-party components are used under their own licences. This product is not affiliated with or endorsed by Autodesk or Anthropic.
+
+Contact: https://skaec.com
+"""
 
 
 def _mailto(subject, body):
@@ -30,7 +65,7 @@ def _mailto(subject, body):
 class SetupApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("%s  v%s" % (APP, VERSION))
+        self.title("%s v%s" % (APP, VERSION))
         self.geometry("880x620")
         self.minsize(760, 500)
         self.rt = nb_license._rt()
@@ -57,10 +92,13 @@ class SetupApp(tk.Tk):
         nb.pack(fill="both", expand=True, padx=8, pady=(8, 4))
         self.tab_setup = ttk.Frame(nb)
         self.tab_lic = ttk.Frame(nb)
+        self.tab_about = ttk.Frame(nb)
         nb.add(self.tab_setup, text="  Setup  ")
         nb.add(self.tab_lic, text="  Licence  ")
+        nb.add(self.tab_about, text="  About  ")
         self._build_setup(self.tab_setup)
         self._build_licence(self.tab_lic)
+        self._build_about(self.tab_about)
         foot = ttk.Frame(self)
         foot.pack(fill="x", padx=12, pady=(0, 8))
         ttk.Label(foot, text="%s v%s   %s" % (APP, VERSION, nb_license.COPYRIGHT), style="Dim.TLabel").pack(side="left")
@@ -125,7 +163,8 @@ class SetupApp(tk.Tk):
         ttk.Label(f, textvariable=self.act_var).grid(row=4, column=1, columnspan=2, sticky="w")
         ttk.Label(f, text="Licence terms:").grid(row=5, column=0, sticky="nw", pady=3)
         ttk.Label(f, text="Licensed for use on this computer only (the Machine ID above). Keys are issued per machine by the developer "
-                          "and are not transferable. Redistribution, copying or reverse engineering of this software is prohibited.",
+                          "and are not transferable. Redistribution, copying or reverse engineering of this software is prohibited. "
+                          "Full licence agreement: About tab (LICENSE.txt).",
                   wraplength=560, justify="left").grid(row=5, column=1, columnspan=2, sticky="w")
 
         ttk.Separator(f, orient="horizontal").grid(row=6, column=0, columnspan=3, sticky="we", pady=14)
@@ -145,11 +184,37 @@ class SetupApp(tk.Tk):
         ttk.Button(btns, text="Re-check licence", command=self.refresh_licence).pack(side="left", padx=6)
 
         ttk.Separator(f, orient="horizontal").grid(row=12, column=0, columnspan=3, sticky="we", pady=14)
-        ttk.Label(f, text="%s  v%s" % (APP, VERSION)).grid(row=13, column=0, columnspan=3, sticky="w")
+        ttk.Label(f, text="%s v%s" % (APP, VERSION)).grid(row=13, column=0, columnspan=3, sticky="w")
         ttk.Label(f, text=nb_license.COPYRIGHT, style="Dim.TLabel").grid(row=14, column=0, columnspan=3, sticky="w")
-        ttk.Label(f, text="This software and its licence keys are the property of the developer. Unauthorised use is prohibited.",
+        ttk.Label(f, text="This software and its licence keys are the property of %s. Unauthorised use is prohibited." % nb_license.PUBLISHER,
                   style="Dim.TLabel", wraplength=700, justify="left").grid(row=15, column=0, columnspan=3, sticky="w")
         f.columnconfigure(1, weight=1)
+
+    def _build_about(self, root):
+        f = ttk.Frame(root, padding=16)
+        f.pack(fill="both", expand=True)
+        ttk.Label(f, text=APP, style="Big.TLabel").pack(anchor="w")
+        ttk.Label(f, text="Version %s   |   %s   |   %s" % (VERSION, nb_license.COPYRIGHT, nb_license.WEBSITE),
+                  style="Dim.TLabel").pack(anchor="w", pady=(2, 2))
+        ttk.Label(f, text="Publisher: %s   |   Developer: %s   |   %s" % (nb_license.PUBLISHER, nb_license.DEVELOPER_NAME,
+                                                                         nb_license.DEVELOPER_EMAIL),
+                  style="Dim.TLabel").pack(anchor="w", pady=(0, 8))
+        ttk.Label(f, text=DESCRIPTION, wraplength=820, justify="left").pack(anchor="w", pady=(0, 8))
+        ttk.Label(f, text="Requirements", style="Big.TLabel").pack(anchor="w")
+        for line in REQUIREMENTS:
+            ttk.Label(f, text="•  " + line, wraplength=820, justify="left").pack(anchor="w", padx=(8, 0), pady=1)
+        self.about_lic = ttk.Label(f, text="Licence: checking…", style="Dim.TLabel", wraplength=820, justify="left")
+        self.about_lic.pack(anchor="w", pady=(8, 4))
+        ttk.Label(f, text="Licence agreement (LICENSE.txt)", style="Big.TLabel").pack(anchor="w")
+        btns = ttk.Frame(f)
+        btns.pack(side="bottom", fill="x", pady=(6, 0))       # packed before the text box so it is never squeezed out
+        ttk.Button(btns, text="Open %s" % nb_license.WEBSITE, command=lambda: webbrowser.open(nb_license.WEBSITE)).pack(side="left")
+        ttk.Button(btns, text="Copy licence text", command=lambda: self._copy(LICENSE_TEXT)).pack(side="left", padx=6)
+        box = self.rt.console(f, wrap="word")
+        box.configure(height=3)
+        box.insert("1.0", LICENSE_TEXT)
+        box.configure(state="disabled")
+        box.pack(fill="both", expand=True, pady=(2, 0))
 
     # ------------------------------------------------------------------ licence tab actions
     def refresh_licence(self):
@@ -180,7 +245,9 @@ class SetupApp(tk.Tk):
             self.act_var.set("%s  (%s)" % (a.get("activated", "?"), "machine key" if a.get("hash", "").startswith("key:") else "password"))
         else:
             self.act_var.set("-")
-        self.lic_label.configure(text=nb_license.status_text())
+        status = nb_license.status_text()
+        self.lic_label.configure(text=status)
+        self.about_lic.configure(text="Licence: " + status)
 
     def _copy(self, text):
         self.clipboard_clear()

@@ -1,4 +1,4 @@
-# Revit MCP Router — product notes (working name)
+# Revit MCP Router by Netbuild — product notes
 
 Intent (2026-09-21): turn this into a program / plugin to sell. This file is the starting brief.
 
@@ -23,6 +23,13 @@ never running a command on the wrong model.
   tray integration, licence expiry dates / subscription model.
 
 ## Changelog
+- **v1.3.7 (2026-10-16) — branding + licence.** Product name **Revit MCP Router by Netbuild**, publisher SKAEC.COM
+  (https://skaec.com), copyright `© 2026 SKAEC.COM. All rights reserved.` in titles, footer, licence dialog and README.txt.
+  New **About** tab in Setup (product, version, publisher, website, requirements, licence status, licence text);
+  proprietary `LICENSE.txt` ships next to the exes. Display-only change: `nb_license.PRODUCT` (part of the key
+  derivation), salts, product codes, file names and the sheet are unchanged — existing keys, passwords and activations
+  keep working (`router_branding_test.py` pins them). No routing change; the bridge's not-activated message now
+  names the product "Revit MCP Router by Netbuild".
 - **v1.3.6 (2026-10-02) — routing-identity fix + disconnect.** Field bug, reproduced twice on the developer PC:
   a session pinned with `pid:19540` (port 48884) kept routing after that Revit closed and a NEW Revit (pid 28568)
   bound the same port, and `revit_status` / `revit_list_sessions` still showed `revit_pid: 19540`; second case
@@ -70,7 +77,6 @@ never running a command on the wrong model.
 - Refuses ambiguity → no "edited the wrong model" incidents. This is the line that sells to BIM managers.
 
 ## Open questions before a first release
-- Name / branding (Netbuild2026 © line already used by Revit Status).
 - Does it target only Claude Code, or any MCP client (Cursor, VS Code)? The bridge is client-agnostic;
   only the installer's `~/.claude.json` step is Claude-specific.
 - Support for a second machine: the router reads pyRevit's registry pickles — verify on a clean PC that the
