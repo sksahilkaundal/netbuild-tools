@@ -1,4 +1,4 @@
-"""Console entry point (ProjectAPlot.exe): setup | models | check | dry | export | run | verify | log-time | about."""
+"""Console entry point (ProjectAPlot.exe): setup | models | check | dry | export | run | verify | log-time | about | license."""
 import os
 import sys
 

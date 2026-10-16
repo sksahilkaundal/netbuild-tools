@@ -1,4 +1,4 @@
-"""Tkinter window: Run tab (model-by-model export pass), Setup tab (link local paths) and About tab."""
+"""Tkinter window: Run tab (model-by-model export pass), Setup tab (link local paths), About and Licence tabs."""
 
 import os
 import queue
@@ -167,12 +167,16 @@ class App(object):
         nb = ttk.Notebook(root)
         nb.pack(fill="both", expand=True)
         self.run_tab, self.setup_tab, self.about_tab = ttk.Frame(nb), ttk.Frame(nb), ttk.Frame(nb)
+        self.licence_tab = ttk.Frame(nb)
         nb.add(self.run_tab, text="  Run  ")
         nb.add(self.setup_tab, text="  Setup / Paths  ")
         nb.add(self.about_tab, text="  About  ")
+        nb.add(self.licence_tab, text="  Licence  ")
+        self.nb = nb
         self._build_run_tab()
         self._build_setup_tab()
         self._build_about_tab()
+        self._build_licence_tab()
         self.status = tk.StringVar(value="Open the first model in Revit, select it below, then click "
                                          "'Model is open'.")
         ttk.Label(root, textvariable=self.status, anchor="w", relief="sunken").pack(fill="x")
@@ -394,12 +398,7 @@ class App(object):
         ttk.Label(left, justify="left", wraplength=480,
                   text="\n".join("- " + x for x in about.FEATURES)).pack(anchor="w", **PAD)
         ttk.Label(right, justify="left", wraplength=480, text=about.requirements_text()).pack(anchor="w", **PAD)
-        lf = ttk.LabelFrame(f, text="License -- %s" % about.LICENSE_NAME)
-        lf.pack(fill="both", expand=True, pady=(8, 0))
-        self.license_box = ScrolledText(lf, height=12, wrap="word", font=("Consolas", 9))
-        self.license_box.insert("1.0", about.LICENSE_TEXT)
-        self.license_box.config(state="disabled")
-        self.license_box.pack(fill="both", expand=True)
+        ttk.Label(f, text="Licence: %s -- see the Licence tab" % about.LICENSE_NAME).pack(anchor="w", pady=(8, 0))
         bar = ttk.Frame(f)
         bar.pack(fill="x", pady=(8, 0))
         ttk.Button(bar, text="Copy product info", command=self._copy_about).pack(side="left", **PAD)
@@ -409,7 +408,34 @@ class App(object):
     def _copy_about(self):
         self.root.clipboard_clear()
         self.root.clipboard_append(about.about_text())
-        self.status.set("Product info, requirements and license copied to the clipboard.")
+        self.status.set("Product info, requirements and licence copied to the clipboard.")
+
+    # ------------------------------------------------------------ Licence tab
+    def _build_licence_tab(self):
+        f = ttk.Frame(self.licence_tab)
+        f.pack(fill="both", expand=True, padx=14, pady=10)
+        ttk.Label(f, text="Licence", font=("Segoe UI", 16, "bold")).pack(anchor="w")
+        ttk.Label(f, text="%s   |   version %s" % (about.PRODUCT, about.VERSION),
+                  foreground="#555").pack(anchor="w", pady=(2, 8))
+        for line in ("Proprietary software -- owned by %s" % about.OWNER, "Website: %s" % about.WEBSITE,
+                     about.LICENCE_KEY):
+            ttk.Label(f, text=line).pack(anchor="w")
+        lf = ttk.LabelFrame(f, text=about.LICENSE_NAME)
+        lf.pack(fill="both", expand=True, pady=(8, 0))
+        self.license_box = ScrolledText(lf, height=20, wrap="word", font=("Consolas", 9))
+        self.license_box.insert("1.0", about.LICENSE_TEXT)
+        self.license_box.config(state="disabled")
+        self.license_box.pack(fill="both", expand=True)
+        bar = ttk.Frame(f)
+        bar.pack(fill="x", pady=(8, 0))
+        ttk.Button(bar, text="Copy licence", command=self._copy_licence).pack(side="left", **PAD)
+        ttk.Button(bar, text="Open %s" % about.WEBSITE,
+                   command=lambda: webbrowser.open(about.WEBSITE)).pack(side="left", **PAD)
+
+    def _copy_licence(self):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(about.LICENSE_TEXT)
+        self.status.set("Licence agreement copied to the clipboard.")
 
     def _browse(self, key, kind):
         cur = self.path_vars[key].get()

@@ -154,25 +154,41 @@ class AboutTests(unittest.TestCase):
         from projecta_plot import __version__, about
         with open(os.path.join(os.path.dirname(os.path.dirname(HERE)), "LICENSE"), encoding="utf-8") as f:
             self.assertEqual(about.LICENSE_TEXT, f.read())            # the About screen shows the real LICENSE
-        self.assertIn("Copyright (c) 2026 SKAEC.COM", about.LICENSE_TEXT)
+        self.assertIn("Copyright (c) 2026 Netbuild. All rights reserved.", about.LICENSE_TEXT)
+        self.assertIn("The Software is proprietary. It is owned by Netbuild", about.LICENSE_TEXT)
+        self.assertEqual(about.OWNER, "Netbuild")
+        self.assertEqual(about.PUBLISHER, "Netbuild")
+        self.assertEqual(about.WEBSITE, "https://skaec.com")
+        self.assertEqual(about.COPYRIGHT, u"\u00a9 2026 Netbuild. All rights reserved.")
+        self.assertEqual(about.LICENSE_NAME, "Netbuild Software Licence Agreement (proprietary)")
+        self.assertEqual(about.LICENCE_KEY, "No licence key required for this product.")
         self.assertEqual(about.PRODUCT, "Plot Runner by Netbuild")
         self.assertEqual(about.title(), "Plot Runner by Netbuild %s" % __version__)
         self.assertEqual(about.title("B001"), "Plot Runner by Netbuild %s -- B001" % __version__)
         text = about.about_text()
-        for want in ("Plot Runner by Netbuild  version " + __version__, u"\u00a9 2026 SKAEC.COM",
+        for want in ("Plot Runner by Netbuild  version " + __version__,
+                     u"\u00a9 2026 Netbuild. All rights reserved.",
                      "https://skaec.com", "ProjectA Plot GA export pass", "Requirements", "Windows 10 / 11",
                      "pyRevit, IronPython engine", "127.0.0.1:48884", "Python 3.9",
                      "export_master_ga_sheets_by_browser_filter.py", "export_podium_sheets_by_revision.py",
-                     "License: MIT License", "Permission is hereby granted"):
+                     "Licence: Netbuild Software Licence Agreement (proprietary) -- owned by Netbuild, "
+                     "https://skaec.com", "No licence key required", "Netbuild Software Licence Agreement\n"):
             self.assertIn(want, text)
+        for gone in ("SKAEC.COM", "MIT", "Permission is hereby granted"):
+            self.assertNotIn(gone, text)
 
     def test_cli_about_and_version(self):
-        from projecta_plot import cli
+        from projecta_plot import about, cli
         buf = io.StringIO()
         with redirect_stdout(buf):
             self.assertEqual(cli.main(["about"]), 0)
-        self.assertIn("SKAEC.COM", buf.getvalue())
+        self.assertIn("2026 Netbuild. All rights reserved.", buf.getvalue())
         self.assertIn("Requirements", buf.getvalue())
+        for cmd in ("license", "licence"):
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                self.assertEqual(cli.main([cmd]), 0)
+            self.assertEqual(buf.getvalue(), about.LICENSE_TEXT)
         buf = io.StringIO()
         with redirect_stdout(buf), self.assertRaises(SystemExit):
             cli.main(["--version"])
@@ -189,9 +205,11 @@ class AboutTests(unittest.TestCase):
                                         "StringStruct", "VarFileInfo", "VarStruct"))
         eval(compile(text.split("\n", 1)[1], "version_info", "eval"), ns)  # what PyInstaller does with it
         fields = dict(a for a, k in seen["StringStruct"])
-        self.assertEqual(fields["CompanyName"], "SKAEC.COM")
+        self.assertEqual(fields["CompanyName"], "Netbuild")
         self.assertEqual(fields["ProductName"], "Plot Runner by Netbuild")
-        self.assertEqual(fields["LegalCopyright"], "(c) 2026 SKAEC.COM -- MIT License")
+        self.assertEqual(fields["LegalCopyright"], "(c) 2026 Netbuild. All rights reserved.")
+        self.assertEqual(fields["Comments"], "https://skaec.com")
+        self.assertTrue(text.isascii())
         self.assertEqual(fields["OriginalFilename"], "Plot Runner by Netbuild.exe")
         self.assertEqual(fields["InternalName"], "Plot Runner by Netbuild")
         self.assertEqual(seen["FixedFileInfo"][0][1]["filevers"][:2], (1, 2))
@@ -437,8 +455,16 @@ class GuiTests(Fixture):
             app = gui.App(root)
             gui.messagebox.askyesno = lambda *a, **k: True
             self.assertTrue(root.title().startswith("Plot Runner by Netbuild 1."))
-            self.assertIn("Copyright (c) 2026 SKAEC.COM", app.license_box.get("1.0", "end"))
+            from projecta_plot import about
+            self.assertEqual([app.nb.tab(t, "text").strip() for t in app.nb.tabs()],
+                             ["Run", "Setup / Paths", "About", "Licence"])
+            app.nb.select(app.licence_tab)
+            root.update()
+            self.assertEqual(app.license_box.get("1.0", "end-1c"), about.LICENSE_TEXT)
             self.assertEqual(str(app.license_box.cget("state")), "disabled")   # read-only
+            app._copy_licence()
+            self.assertEqual(root.clipboard_get(), about.LICENSE_TEXT)
+            app.nb.select(app.run_tab)
             app.date.set("06-Sep-2026")
             app.out_date.set("20261015")
             app.mode.set("pdf+cad")

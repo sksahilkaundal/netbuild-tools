@@ -29,6 +29,11 @@ def _sheet_spec(a):
     return spec
 
 
+def _print_text(text):
+    enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+    print(text.encode(enc, "replace").decode(enc))     # a console without the (c) sign
+
+
 def _job(a, s):
     job = Job(a.plot_root or s["plot_root"], a.out or today(), a.date or "", a.mode, _sheet_spec(a))
     problems = job.problems()
@@ -41,7 +46,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="ProjectAPlot", description=(
         "%s %s -- the ProjectA Plot GA export pass, model by model (talks to Revit through the pyRevit MCP "
         "listener; your export scripts are never edited)" % (about.PRODUCT, about.VERSION)),
-        epilog="%s  |  %s  |  %s (ProjectAPlot about)" % (about.COPYRIGHT, about.WEBSITE, about.LICENSE_NAME))
+        epilog="%s  |  %s  |  %s (ProjectAPlot license)" % (about.COPYRIGHT, about.WEBSITE, about.LICENSE_NAME))
     ap.add_argument("--version", action="version", version="%s %s" % (about.PRODUCT, about.VERSION))
     sub = ap.add_subparsers(dest="cmd")
 
@@ -84,12 +89,15 @@ def main(argv=None):
     t.add_argument("--manual", type=float, help="minutes the manual process takes")
     t.add_argument("--notes", default="")
     sub.add_parser("gui", help="open the window (default)")
-    sub.add_parser("about", help="product info, requirements and license")
+    sub.add_parser("about", help="product info, requirements and licence")
+    sub.add_parser("license", aliases=["licence"], help="the licence agreement (proprietary, Netbuild)")
 
     a = ap.parse_args(argv)
     if a.cmd == "about":
-        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
-        print(about.about_text().encode(enc, "replace").decode(enc))     # a console without the (c) sign
+        _print_text(about.about_text())
+        return 0
+    if a.cmd in ("license", "licence"):
+        _print_text(about.LICENSE_TEXT.rstrip("\n"))   # exactly the LICENSE file
         return 0
 
     s = Settings()
