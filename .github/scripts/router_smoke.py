@@ -24,8 +24,9 @@ os.environ.setdefault("REVIT_MCP_EXTENSION_DIR",
 failed = []
 
 print("== RevitMcpBridge.exe --check", flush=True)
-r = subprocess.run([bridge, "--check"], capture_output=True, text=True, timeout=180)
-print(r.stdout[-4000:], r.stderr[-4000:], "exit", r.returncode, flush=True)
+r = subprocess.run([bridge, "--check"], capture_output=True, timeout=180)     # bytes: console code page, not UTF-8
+print(r.stdout.decode("mbcs", "replace")[-4000:], r.stderr.decode("mbcs", "replace")[-4000:], "exit", r.returncode,
+      flush=True)
 
 print("== Revit MCP Router Setup.exe --selftest", flush=True)
 res = os.path.join(app, "selftest_result.txt")
