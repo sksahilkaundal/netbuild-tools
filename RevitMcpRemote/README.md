@@ -1,6 +1,6 @@
 # Remote Router by Netbuild (v0.5.0)
 
-© 2026 SKAEC.COM. All rights reserved. — https://skaec.com — proprietary, see [Licence](#licence).
+Proprietary -- (c) 2026 Netbuild. All rights reserved. https://skaec.com -- see [Licence](#licence).
 
 Revit MCP Router by Netbuild, reachable from **Claude on the web** (and desktop / mobile) as a custom connector.
 Same tools and the same session routing as the local router (`revit_list_sessions`, `revit_select_session`,
@@ -27,17 +27,17 @@ Claude (claude.ai)  --HTTPS-->  Cloudflare Tunnel  -->  127.0.0.1:8765  [OAuth g
 |---|---|
 | `revit_mcp_remote.py` | entry point: loads the router's tools, serves HTTP, starts the tunnel, `--setup` / `--check` / `--revoke-all` |
 | `oauth_gate.py` | OAuth 2.1 server + bearer check in front of `/mcp` (stdlib + starlette) |
-| `remote_about.py` | product name, version, copyright, requirements and licence text (`--about`, `--version`, banner, sign-in page) |
-| `LICENSE.txt` | the licence agreement |
+| `remote_about.py` | product name, version, owner, copyright, requirements and licence text (`--about`, `--license`, `--version`, banner, sign-in page, `/license`) |
+| `LICENSE.txt` | the Netbuild Software Licence Agreement |
 | `Start Revit MCP Remote.cmd` | double-click launcher: first-run setup, then serve + quick tunnel |
 | `tests/test_remote.py` | end-to-end test against `tests/fake_bridge.py` (no Revit needed) |
 | `tests/test_remote_about.py` | About / licence / `--version` checks |
 
 ## About
 
-`py -3.14 revit_mcp_remote.py --about` prints the product info, requirements and licence;
-`--version` prints `Remote Router by Netbuild 0.5.0`. The startup banner and the sign-in page show the same
-name and copyright. All of it comes from `remote_about.py`.
+`py -3.14 revit_mcp_remote.py --about` prints the product info, requirements and a one-line licence summary;
+`--license` (or `--licence`) prints the Licence page; `--version` prints `Remote Router by Netbuild 0.5.0`.
+The startup banner and the sign-in page show the same name and copyright. All of it comes from `remote_about.py`.
 
 ## Requirements
 
@@ -146,12 +146,21 @@ py -3.14 -m unittest discover -s tests -v
 ```
 (`py -3.14 tests\test_remote.py` still runs the end-to-end checks on their own.)
 Covers: 401 + discovery, public-host metadata, redirect allow-list, wrong/locked passphrase, PKCE, single-use codes,
-MCP `tools/list` + call through the gate, refresh rotation, static token, revoke-all, deny-tools, and the About /
-licence / `--version` output.
+MCP `tools/list` + call through the gate, refresh rotation, static token, revoke-all, deny-tools, the public `/license`
+page, and the About / `--license` / `--version` output.
 
 ## Licence
 
-Proprietary. **Remote Router by Netbuild** is a paid Netbuild product, licensed (not sold) by SKAEC.COM under the
-terms in [`LICENSE.txt`](LICENSE.txt); it runs only alongside a licensed copy of Revit MCP Router by Netbuild.
+Proprietary -- (c) 2026 Netbuild. All rights reserved. https://skaec.com
+
+**Remote Router by Netbuild** is proprietary software owned by Netbuild, licensed (not sold) under the
+Netbuild Software Licence Agreement in [`LICENSE.txt`](LICENSE.txt). The same text is shown by
+`py -3.14 revit_mcp_remote.py --license` and, while the server runs, at `/license` on the connector's host
+(public, read-only: product and licence text only, no token needed; the sign-in page footer links to it).
+
+**Licence key:** none of its own. It serves the tools of Revit MCP Router by Netbuild, so it uses that product's
+licence on this PC: the router checks its per-PC licence when its tools load, and while it is not activated every
+Revit call returns the router's licence message.
+
 Autodesk and Revit are registered trademarks of Autodesk, Inc.; this product is not affiliated with or endorsed by
 Autodesk or Anthropic.

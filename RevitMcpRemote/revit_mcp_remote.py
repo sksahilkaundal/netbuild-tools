@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Remote Router by Netbuild - Revit MCP Router by Netbuild, reachable from Claude on the web.
-(c) 2026 SKAEC.COM. All rights reserved. Proprietary - see LICENSE.txt; product info in remote_about.py.
+(c) 2026 Netbuild. All rights reserved. https://skaec.com
+Proprietary - see LICENSE.txt (--license); product info in remote_about.py.
 
 Same tools, same routing as the local router (it loads bridge_core.build_server()
 from the RevitMcpRouter folder, so revit_list_sessions / revit_select_session /
@@ -20,7 +21,8 @@ Usage (Windows, from this folder):
     py -3.14 revit_mcp_remote.py --tunnel quick     serve + print the connector URL
     py -3.14 revit_mcp_remote.py --check            list tools, test routing, exit
     py -3.14 revit_mcp_remote.py --revoke-all       sign every client out
-    py -3.14 revit_mcp_remote.py --about            product info, requirements, licence
+    py -3.14 revit_mcp_remote.py --about            product info, requirements, licence summary
+    py -3.14 revit_mcp_remote.py --license          licence page: owner, licence key, full agreement
     py -3.14 revit_mcp_remote.py --version
 
 Privacy hardening (useful on a managed / Work PC):
@@ -387,9 +389,11 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=(
         "%s %s -- Revit MCP Router by Netbuild served to Claude on the web as a remote MCP connector. %s"
         % (remote_about.PRODUCT, VERSION, remote_about.COPYRIGHT)),
-        epilog="%s  |  %s (--about)" % (remote_about.WEBSITE, remote_about.LICENSE_NAME))
+        epilog="%s  |  %s (--license)" % (remote_about.WEBSITE, remote_about.LICENSE_NAME))
     ap.add_argument("--version", action="version", version="%s %s" % (remote_about.PRODUCT, VERSION))
-    ap.add_argument("--about", action="store_true", help="product info, requirements and licence, then exit")
+    ap.add_argument("--about", action="store_true", help="product info, requirements and licence summary, then exit")
+    ap.add_argument("--license", "--licence", dest="license", action="store_true",
+                    help="the Licence page (owner, licence key, full agreement), then exit")
     ap.add_argument("--setup", action="store_true", help="set the passphrase and a new static token")
     ap.add_argument("--rotate-token", action="store_true", help="replace the static bearer token only")
     ap.add_argument("--revoke-all", action="store_true", help="forget every OAuth client and token")
@@ -418,7 +422,10 @@ def main(argv=None):
                          "selected Revit, so N Claude chats can each drive a different Revit at once")
     a = ap.parse_args(argv)
     if a.about:
-        print(_safe(remote_about.about_text(), sys.stdout))
+        print(_safe(remote_about.about_text(license=False), sys.stdout))
+        return 0
+    if a.license:
+        print(_safe(remote_about.license_text(), sys.stdout))
         return 0
 
     # --state-dir must be in place before the Store reads/writes the passphrase file.

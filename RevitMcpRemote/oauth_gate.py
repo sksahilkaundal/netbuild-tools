@@ -10,7 +10,8 @@ can sign in. The sign-in page asks for the passphrase set with --setup.
 A static bearer token (also from --setup) is accepted too, for clients that
 send headers directly (Claude Code: --header "Authorization: Bearer ...").
 
-Everything except /healthz and the OAuth endpoints needs a valid bearer token.
+Everything except /healthz, /license (static product + licence text) and the
+OAuth endpoints needs a valid bearer token.
 Secrets are only ever stored hashed. Stdlib + starlette (ships with mcp).
 """
 from __future__ import annotations
@@ -48,8 +49,37 @@ DEFAULT_REDIRECT_PREFIXES = (
     "http://127.0.0.1:",
 )
 
-PUBLIC_PATHS = ("/healthz", "/register", "/authorize", "/token", "/revoke")
+LICENSE_PATHS = ("/license", "/licence")
+PUBLIC_PATHS = ("/healthz", "/register", "/authorize", "/token", "/revoke") + LICENSE_PATHS
 WELL_KNOWN = "/.well-known/"
+PAGE_HEADERS = {"Cache-Control": "no-store", "X-Frame-Options": "DENY"}
+
+
+def _copyright_html() -> str:
+    """'&copy; 2026 Netbuild. All rights reserved.'"""
+    return html.escape(remote_about.COPYRIGHT).replace(u"\u00a9", "&copy;")
+
+
+def license_page() -> HTMLResponse:
+    """GET /license: the Licence page (product, owner, licence key, full agreement). Static text from
+    remote_about only -- no request data, no state, no secrets -- so it is served without a token."""
+    product = html.escape(remote_about.PRODUCT)
+    head = "".join("<p>%s</p>" % html.escape(line) for line in remote_about.license_lines()[1:]
+                   if line != remote_about.COPYRIGHT)
+    body = """<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>%s - licence</title>
+<style>body{font-family:Segoe UI,system-ui,sans-serif;background:#f4f5f7;margin:0;padding:40px 16px}
+.card{max-width:720px;margin:auto;background:#fff;border-radius:10px;padding:28px;box-shadow:0 2px 10px #0002}
+h1{font-size:20px;margin:0 0 6px}p{color:#444;font-size:14px;margin:4px 0}
+pre{white-space:pre-wrap;font-size:13px;color:#222;background:#f8f9fa;border-radius:6px;padding:16px;margin:16px 0 0}
+.foot{color:#888;font-size:12px;margin:20px 0 0}</style>
+</head><body><div class="card"><h1>%s %s</h1>
+%s<pre>%s</pre>
+<p class="foot">%s</p></div></body></html>""" % (
+        product, product, html.escape(remote_about.VERSION), head,
+        html.escape(remote_about.LICENSE_TEXT.rstrip()), _copyright_html())
+    return HTMLResponse(body, headers=dict(PAGE_HEADERS))
 
 
 def _sha(s: str) -> str:
@@ -274,9 +304,9 @@ button{background:#1f4e79;color:#fff;border:0;border-radius:6px;padding:10px 18p
 <form method="post" action="/authorize">%s
 <label>Passphrase<input type="password" name="passphrase" autofocus autocomplete="current-password"></label>
 <button type="submit">Allow</button></form>
-<p class="foot">&copy; %s %s</p></div></body></html>""" % (
+<p class="foot">%s &middot; <a href="/license" target="_blank" rel="noopener">Licence</a></p></div></body></html>""" % (
             product, product, html.escape(client.get("client_name", "?")), redirect_host, err, hidden,
-            html.escape(remote_about.YEAR), html.escape(remote_about.PUBLISHER))
+            _copyright_html())
         return HTMLResponse(body, status_code=status, headers={"Cache-Control": "no-store",
                                                                 "X-Frame-Options": "DENY"})
 
@@ -366,6 +396,8 @@ button{background:#1f4e79;color:#fff;border:0;border-radius:6px;padding:10px 18p
             response = self.as_metadata(request)
         elif path == "/healthz":
             response = JSONResponse({"ok": True})
+        elif path in LICENSE_PATHS and method == "GET":
+            response = license_page()
         elif path == "/register" and method == "POST":
             response = await self.register(request)
         elif path == "/authorize" and method in ("GET", "POST"):

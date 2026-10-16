@@ -2,7 +2,8 @@
 """
 End-to-end test of Revit MCP Remote against a fake bridge (no Revit needed):
 OAuth discovery -> DCR -> passphrase sign-in -> PKCE token -> MCP tools/list + call,
-refresh rotation, static token, lock-out, redirect allow-list, deny-tools.
+refresh rotation, static token, lock-out, redirect allow-list, deny-tools,
+public read-only /license page.
 
     py -3.14 tests\\test_remote.py
 """
@@ -93,6 +94,24 @@ def main():
     check("1 unauthenticated 401", r.status_code == 401 and "resource_metadata=" in r.headers.get("www-authenticate", ""),
           r.status_code)
 
+    # 1b. /license (and /licence): public, read-only, static product + licence text only
+    for path in ("/license", "/licence"):
+        r = c.get(path, headers={"Host": "abc.trycloudflare.com"})
+        check("1b %s page without a token" % path, r.status_code == 200
+              and r.headers.get("content-type", "").startswith("text/html")
+              and "Netbuild Software Licence Agreement" in r.text
+              and "<h1>Remote Router by Netbuild %s</h1>" % rmr.VERSION in r.text
+              and "Proprietary software -- owned by Netbuild" in r.text
+              and "No separate key" in r.text and "https://skaec.com" in r.text
+              and "&copy; 2026 Netbuild. All rights reserved." in r.text
+              and "trycloudflare" not in r.text, r.status_code)
+        check("1c %s headers" % path, r.headers.get("cache-control") == "no-store"
+              and r.headers.get("x-frame-options") == "DENY", dict(r.headers))
+    r = c.post("/license", json={})
+    check("1d /license is read-only", r.status_code == 405, r.status_code)
+    r = c.get("/license/x")
+    check("1e only the exact path is public", r.status_code == 401, r.status_code)
+
     # 2. discovery uses the PUBLIC host (tunnel) and https
     r = c.get("/.well-known/oauth-protected-resource", headers={"Host": "abc.trycloudflare.com"})
     check("2 resource metadata", r.json()["authorization_servers"] == ["https://abc.trycloudflare.com"]
@@ -116,7 +135,8 @@ def main():
     check("4 sign-in page", r.status_code == 200 and "passphrase" in r.text, r.status_code)
     check("4a sign-in page branding", "<h1>Remote Router by Netbuild</h1>" in r.text
           and "<title>Remote Router by Netbuild - sign in</title>" in r.text
-          and "&copy; 2026 SKAEC.COM" in r.text, r.text)
+          and "&copy; 2026 Netbuild. All rights reserved." in r.text
+          and '<a href="/license" target="_blank" rel="noopener">Licence</a>' in r.text, r.text)
     r = c.get("/authorize", params=dict(q, code_challenge_method="plain"))
     check("4b plain PKCE refused", r.status_code == 400, r.status_code)
     r = c.post("/authorize", data=dict(q, passphrase="nope"))
