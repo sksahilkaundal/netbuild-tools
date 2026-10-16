@@ -1,0 +1,47 @@
+name: Build Level Shifter (Windows exe)
+
+on:
+  push:
+    branches: [main, "netbuild/**"]
+    paths: ["LevelShifter/**", ".github/workflows/build-level-shift-exe.yml"]
+  pull_request:
+    paths: ["LevelShifter/**", ".github/workflows/build-level-shift-exe.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install pyinstaller==6.11.1
+
+      - name: Unit tests (Windows, includes the window test)
+        run: python -m unittest discover -s LevelShifter/tests -v
+
+      - name: Build LevelShifter.exe (window) and LevelShift.exe (command line)
+        working-directory: LevelShifter
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name LevelShifter LevelShifter.pyw
+          pyinstaller --noconfirm --onefile --console --name LevelShift LevelShift_cli.py
+
+      - name: Smoke test the frozen exe
+        run: python LevelShifter/tests/smoke_exe.py LevelShifter/dist/LevelShift.exe
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force pkg/LevelShifter | Out-Null
+          Copy-Item LevelShifter/dist/LevelShifter.exe, LevelShifter/dist/LevelShift.exe, LevelShifter/README.md pkg/LevelShifter/
+          Get-ChildItem pkg/LevelShifter | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LevelShifter-windows
+          path: pkg/
+          retention-days: 90
