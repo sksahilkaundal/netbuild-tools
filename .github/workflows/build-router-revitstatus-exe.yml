@@ -23,11 +23,15 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 90
     env:
-      RMR_BUILD_DIR: ${{ runner.temp }}\rmr_build
-      RS_BUILD_DIR: ${{ runner.temp }}\rs_build
       PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
+
+      - name: Build folders (outside the checkout)
+        shell: pwsh
+        run: |
+          "RMR_BUILD_DIR=$env:RUNNER_TEMP\rmr_build" >> $env:GITHUB_ENV
+          "RS_BUILD_DIR=$env:RUNNER_TEMP\rs_build" >> $env:GITHUB_ENV
 
       - uses: actions/setup-python@v5
         with:
