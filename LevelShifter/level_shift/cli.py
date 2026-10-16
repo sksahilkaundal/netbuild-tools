@@ -3,6 +3,7 @@
 import argparse
 import sys
 
+from . import about
 from .core import MAX_LEVELS, MoveSpec
 from .runner import Aborted, Runner
 from .settings import DEFAULTS, Settings
@@ -27,8 +28,10 @@ def _specs(a, units):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="LevelShift", description=(
-        "Move up to %d levels to a new elevation while every element on them keeps its X, Y, Z "
-        "(talks to Revit through the pyRevit MCP listener)" % MAX_LEVELS))
+        "%s %s -- move up to %d levels to a new elevation while every element on them keeps its X, Y, Z "
+        "(talks to Revit through the pyRevit MCP listener)" % (about.PRODUCT, about.VERSION, MAX_LEVELS)),
+        epilog="%s  |  %s  |  %s (LevelShift about)" % (about.COPYRIGHT, about.WEBSITE, about.LICENSE_NAME))
+    ap.add_argument("--version", action="version", version="%s %s" % (about.PRODUCT, about.VERSION))
     ap.add_argument("--model", help="Revit title must contain this (default from settings; blank = active model)")
     ap.add_argument("--units", choices=["mm", "m"], help="units for values without a suffix (default from settings)")
     sub = ap.add_subparsers(dest="cmd")
@@ -50,6 +53,7 @@ def main(argv=None):
             p.add_argument("--keep-drift", action="store_true",
                            help="keep the result even if some element still moved (they are listed)")
     sub.add_parser("gui", help="open the window (default)")
+    sub.add_parser("about", help="product info, requirements and license")
 
     a = ap.parse_args(argv)
     s = Settings()
@@ -57,6 +61,11 @@ def main(argv=None):
         s["model_match"] = a.model
     if a.units:
         s["units"] = a.units
+
+    if a.cmd == "about":
+        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+        print(about.about_text().encode(enc, "replace").decode(enc))     # a console without the (c) sign
+        return 0
 
     if a.cmd in (None, "gui"):
         from .gui import main as gui_main

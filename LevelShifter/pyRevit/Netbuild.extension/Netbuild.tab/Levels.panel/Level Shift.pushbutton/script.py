@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Move up to 10 levels up or down. Every element hosted to them keeps its X, Y, Z.
+"""Level Shift by Netbuild -- move up to 10 levels up or down; every element hosted to them keeps its X, Y, Z.
 
-Runs directly inside Revit -- no exe, no MCP listener.
-Check (plan only) -> Trial run (rolls back) -> Apply (one Undo entry: 'Netbuild Level Shift').
+Runs directly inside Revit (no exe, no MCP listener).
+Check (plan only) -> Trial run (rolls back) -> Apply (one Undo entry: 'Level Shift by Netbuild').
+(c) 2026 SKAEC.COM -- MIT License. About: the About button in the window, or Netbuild > About.
 """
 
 __title__ = "Level\nShift"
-__author__ = "Netbuild"
+__author__ = "Netbuild -- SKAEC.COM"
 
 import datetime
 import io
@@ -19,9 +20,10 @@ from System.Windows.Controls import ListBoxItem
 from System.Windows.Input import Cursors, Mouse
 from System.Windows.Media import BrushConverter
 
-from level_shift import __version__, core
+from level_shift import about, core
 from level_shift.units import fmt, from_ft, parse_length
 import levelshift_ui as ui
+import netbuild_about
 
 N = core.MAX_LEVELS
 CFG = script.get_config()
@@ -117,7 +119,7 @@ class LevelShiftWindow(forms.WPFWindow):
         self.levels = []
         self.mode = [None] * N          # per row: "to" | "by" -- the field typed in last
         self.guard = False
-        self.Title = "Netbuild Level Shift %s (direct) -- %s" % (__version__, doc.Title)
+        self.Title = about.title(doc.Title)
         self.model_tb.Text = doc.Title
         units = CFG.get_option("units", "mm")
         self.m_rb.IsChecked = units == "m"
@@ -142,6 +144,7 @@ class LevelShiftWindow(forms.WPFWindow):
         self.apply_btn.Click += lambda s_, e: self.run("apply")
         self.logs_btn.Click += lambda s_, e: Process.Start(logs_dir())
         self.close_btn.Click += lambda s_, e: self.Close()
+        self.about_btn.Click += lambda s_, e: netbuild_about.show(about, owner=self)
         self.load_levels()
 
     # ------------------------------------------------------------ helpers
@@ -369,7 +372,7 @@ class LevelShiftWindow(forms.WPFWindow):
         if action == "apply" and result.get("committed"):
             self.clear_values()
             self.load_levels()
-            self.status("Applied -- levels re-read. Ctrl+Z in Revit undoes it ('Netbuild Level Shift').")
+            self.status("Applied -- levels re-read. Ctrl+Z in Revit undoes it ('Level Shift by Netbuild').")
 
 
 def fmt_ft(feet, units):

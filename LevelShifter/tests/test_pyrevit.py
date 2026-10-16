@@ -19,8 +19,10 @@ ROOT = os.path.dirname(HERE)
 EXT = os.path.join(ROOT, "pyRevit", "Netbuild.extension")
 PANEL = os.path.join(EXT, "Netbuild.tab", "Levels.panel")
 DIRECT = os.path.join(PANEL, "Level Shift.pushbutton", "script.py")
-APP = os.path.join(PANEL, "Level Shifter App.pushbutton", "script.py")
-APP_CONFIG = os.path.join(PANEL, "Level Shifter App.pushbutton", "config.py")
+APP = os.path.join(PANEL, "Level Shift App.pushbutton", "script.py")
+APP_CONFIG = os.path.join(PANEL, "Level Shift App.pushbutton", "config.py")
+ABOUT = os.path.join(EXT, "Netbuild.tab", "About.panel", "About.pushbutton", "script.py")
+APP_EXE = "Level Shift by Netbuild.exe"
 sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
 sys.path.append(os.path.join(EXT, "lib"))          # levelshift_ui, levelshift_app
@@ -34,8 +36,9 @@ import levelshift_ui  # noqa: E402
 sys.path.insert(0, os.path.join(ROOT))
 from sync_pyrevit_lib import SHARED  # noqa: E402
 
-IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DIRECT, APP, APP_CONFIG] +
-                    [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py")])
+IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DIRECT, APP, APP_CONFIG, ABOUT] +
+                    [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py",
+                                                            "netbuild_about.py")])
 
 
 class ExtensionFileTests(unittest.TestCase):
@@ -82,21 +85,28 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertIn("New elevation (mm)", ET.tostring(dlg, encoding="unicode"))
 
     def test_icons_and_titles(self):
-        for d in ("Level Shift.pushbutton", "Level Shifter App.pushbutton"):
-            with open(os.path.join(PANEL, d, "icon.png"), "rb") as f:
+        for script_path in (DIRECT, APP, ABOUT):
+            with open(os.path.join(os.path.dirname(script_path), "icon.png"), "rb") as f:
                 self.assertEqual(f.read(8), b"\x89PNG\r\n\x1a\n")
+            with open(script_path, encoding="utf-8") as f:
+                src = f.read()
+            self.assertIn("SKAEC.COM", src, script_path)              # every button names its publisher
+        with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "About"])
 
     def test_find_exe_and_args(self):
         tmp = tempfile.mkdtemp()
         try:
-            exe = os.path.join(tmp, "Netbuild", "LevelShifter", "LevelShifter.exe")
-            os.makedirs(os.path.dirname(exe))
-            open(exe, "w").close()
+            old = os.path.join(tmp, "Netbuild", "LevelShifter", "LevelShifter.exe")       # a 1.2 install
+            os.makedirs(os.path.dirname(old))
+            open(old, "w").close()
             self.assertIsNone(levelshift_app.find_exe("", env={}))
-            self.assertEqual(levelshift_app.find_exe("", env={"LOCALAPPDATA": tmp}), exe)
-            self.assertEqual(levelshift_app.find_exe(exe, env={}), exe)
-            self.assertEqual(levelshift_app.candidates("", env={})[0],
-                             os.path.join(EXT, "bin", "LevelShifter.exe"))
+            self.assertEqual(levelshift_app.find_exe("", env={"LOCALAPPDATA": tmp}), old)
+            new = os.path.join(tmp, "Netbuild", "LevelShifter", APP_EXE)
+            open(new, "w").close()
+            self.assertEqual(levelshift_app.find_exe("", env={"LOCALAPPDATA": tmp}), new)     # new name first
+            self.assertEqual(levelshift_app.find_exe(old, env={}), old)
+            self.assertEqual(levelshift_app.candidates("", env={})[0], os.path.join(EXT, "bin", APP_EXE))
             self.assertEqual(levelshift_app.args_line('Model "A"_user'), '--model "Model A_user"')
             self.assertEqual(levelshift_app.args_line(""), "")
         finally:
@@ -217,8 +227,9 @@ class ButtonTests(unittest.TestCase):
         st = pyrevit_stubs.install(self.doc)
         with self.assertRaises(pyrevit_stubs.ScriptExit):                # no exe, nothing picked
             runpy.run_path(APP, run_name="__main__")
-        self.assertIn("LevelShifter.exe was not found", st.alerts[0][1])
-        exe = os.path.join(self.tmp, "Netbuild", "LevelShifter", "LevelShifter.exe")
+        self.assertIn("Level Shift by Netbuild.exe was not found", st.alerts[0][1])
+        self.assertEqual(st.alerts[0][0], "Level Shift by Netbuild")
+        exe = os.path.join(self.tmp, "Netbuild", "LevelShifter", APP_EXE)
         os.makedirs(os.path.dirname(exe))
         open(exe, "w").close()
         runpy.run_path(APP, run_name="__main__")
@@ -227,6 +238,39 @@ class ButtonTests(unittest.TestCase):
         st.picked = os.path.join(self.tmp, "Other.exe")
         runpy.run_path(APP_CONFIG, run_name="__main__")                 # Shift+Click
         self.assertEqual(st.config.values["exe_path"], st.picked)
+
+    def check_about(self, win):
+        from level_shift import about
+        self.assertEqual(win.Title, "About Level Shift by Netbuild")
+        self.assertEqual(win.product_tb.Text, "Level Shift by Netbuild")
+        self.assertIn(u"\u00a9 2026 SKAEC.COM", win.version_tb.Text)
+        self.assertIn(about.VERSION, win.version_tb.Text)
+        self.assertIn("Autodesk Revit 2019 - 2026", win.req_tb.Text)
+        self.assertIn("pyRevit 4.8", win.req_tb.Text)
+        self.assertEqual(win.license_tb.Text, about.LICENSE_TEXT)
+        self.assertEqual(win.license_gb.Header, "License -- MIT License")
+
+    def test_about_button(self):
+        st = pyrevit_stubs.install(self.doc)
+        runpy.run_path(ABOUT, run_name="__main__")
+        win = pyrevit_stubs.WPFWindow.shown[-1]
+        self.check_about(win)
+        win.copy_btn.click()
+        self.assertIn("Level Shift by Netbuild  version", st.clipboard[-1])
+        self.assertIn("Permission is hereby granted", st.clipboard[-1])
+        win.web_btn.click()
+        self.assertEqual(st.started[-1], "https://skaec.com")
+
+    def test_level_shift_window_title_and_about(self):
+        pyrevit_stubs.install(self.doc)
+        runpy.run_path(DIRECT, run_name="__main__")
+        win = pyrevit_stubs.WPFWindow.shown[0]
+        self.assertTrue(win.Title.startswith("Level Shift by Netbuild 1."), win.Title)
+        self.assertTrue(win.Title.endswith(self.doc.Title))
+        win.about_btn.click()
+        about_win = pyrevit_stubs.WPFWindow.shown[-1]
+        self.check_about(about_win)
+        self.assertIs(about_win.Owner, win)
 
 
 if __name__ == "__main__":

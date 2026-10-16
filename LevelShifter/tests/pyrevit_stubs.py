@@ -141,7 +141,7 @@ class Config(object):
 def install(doc, answers=None):
     """Put stub pyrevit / System modules in sys.modules. Returns a namespace the test inspects."""
     state = types.SimpleNamespace(alerts=[], started=[], config=Config(), saved=0, answers=answers or {},
-                                  picked=None)
+                                  picked=None, clipboard=[])
 
     def alert(msg, title="", yes=False, no=False, exitscript=False, **kw):
         state.alerts.append((title, msg))
@@ -196,10 +196,12 @@ def install(doc, answers=None):
     media = types.ModuleType("System.Windows.Media")
     media.BrushConverter = BrushConverter
     windows = types.ModuleType("System.Windows")
+    windows.Clipboard = types.SimpleNamespace(SetText=lambda text: state.clipboard.append(text))
     system = types.ModuleType("System")
     sys.modules.update({"pyrevit": pyrevit, "pyrevit.forms": forms, "pyrevit.revit": revit_mod,
                         "pyrevit.script": script, "System": system, "System.Windows": windows,
                         "System.Diagnostics": diag, "System.Windows.Controls": controls,
                         "System.Windows.Input": inp, "System.Windows.Media": media})
     WPFWindow.shown, WPFWindow.on_dialog = [], None
+    sys.modules.pop("netbuild_about", None)       # binds the stubs above when a button imports it
     return state

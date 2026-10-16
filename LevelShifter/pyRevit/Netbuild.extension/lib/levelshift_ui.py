@@ -24,7 +24,7 @@ _ROW = '''
                 Content="Define new level..."/>'''
 
 _WINDOW = '''<Window {ns}
-        Title="Netbuild Level Shift" Width="1010" Height="880" MinWidth="900" MinHeight="620"
+        Title="Level Shift by Netbuild" Width="1010" Height="880" MinWidth="900" MinHeight="620"
         WindowStartupLocation="CenterScreen" FontFamily="Segoe UI" FontSize="12" ShowInTaskbar="False">
   <DockPanel Margin="10">
     <StackPanel DockPanel.Dock="Top">
@@ -78,6 +78,7 @@ _WINDOW = '''<Window {ns}
       <Button x:Name="trial_btn" Content="2. Trial run (rolls back)" Padding="10,3" Margin="0,0,6,0"/>
       <Button x:Name="apply_btn" Content="3. Apply" Padding="10,3" Margin="0,0,20,0" FontWeight="Bold"/>
       <Button x:Name="logs_btn" Content="Open logs folder" Padding="10,3" Margin="0,0,6,0"/>
+      <Button x:Name="about_btn" Content="About" Padding="10,3" Margin="0,0,6,0"/>
       <Button x:Name="close_btn" Content="Close" Padding="10,3"/>
     </WrapPanel>
     <TextBlock x:Name="status_tb" DockPanel.Dock="Top" Foreground="#555555" Margin="0,6,0,0" TextWrapping="Wrap"/>
@@ -127,6 +128,48 @@ _DEFINE = '''<Window {ns}
     </StackPanel>
   </StackPanel>
 </Window>'''
+
+
+_ABOUT = '''<Window {ns}
+        Title="About {product}" Width="760" Height="720" MinWidth="560" MinHeight="480"
+        WindowStartupLocation="CenterOwner" FontFamily="Segoe UI" FontSize="12" ShowInTaskbar="False">
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Top">
+      <TextBlock x:Name="product_tb" FontSize="20" FontWeight="Bold"/>
+      <TextBlock x:Name="version_tb" Foreground="#555555" Margin="0,2,0,0"/>
+      <TextBlock x:Name="desc_tb" TextWrapping="Wrap" Margin="0,10,0,0"/>
+    </StackPanel>
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+      <Button x:Name="copy_btn" Content="Copy product info" Padding="10,3" Margin="0,0,6,0"/>
+      <Button x:Name="web_btn" Padding="10,3" Margin="0,0,6,0"/>
+      <Button x:Name="close_btn" Content="Close" Padding="10,3" IsCancel="True" IsDefault="True"/>
+    </StackPanel>
+    <Grid Margin="0,10,0,0">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+      <GroupBox Grid.Row="0" Grid.Column="0" Header="Features" Margin="0,0,6,6">
+        <TextBlock x:Name="features_tb" TextWrapping="Wrap" Margin="4"/>
+      </GroupBox>
+      <GroupBox Grid.Row="0" Grid.Column="1" Header="Requirements" Margin="0,0,0,6">
+        <TextBlock x:Name="req_tb" TextWrapping="Wrap" Margin="4"/>
+      </GroupBox>
+      <GroupBox x:Name="license_gb" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
+        <TextBox x:Name="license_tb" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
+                 VerticalScrollBarVisibility="Auto" BorderThickness="0"/>
+      </GroupBox>
+    </Grid>
+  </DockPanel>
+</Window>'''
+
+
+def about_xaml(product):
+    return _ABOUT.format(ns=_NS, product=product)
 
 
 def window_xaml(count):

@@ -12,7 +12,7 @@ One payload serves every action; ``_LS`` (a literal dict prepended per call) say
                 is changed.
 * ``trial``  -- do the whole move inside a TransactionGroup, measure every model element, then
                 ROLL BACK.  The model is left exactly as it was.
-* ``apply``  -- the same, then Assimilate (one Undo entry: "Netbuild Level Shift") -- unless an
+* ``apply``  -- the same, then Assimilate (one Undo entry: "Level Shift by Netbuild") -- unless an
                 element still moved and ``rollback_on_drift`` is set, in which case roll back.
 
 How the elements keep their X, Y, Z
@@ -585,7 +585,7 @@ def _main():
     def errors_now():
         return [t for k, t in _MSGS if k == "error"]
 
-    tg = TransactionGroup(d, "Netbuild Level Shift")
+    tg = TransactionGroup(d, "Level Shift by Netbuild")
     tg.Start()
     committed = False
     notes = []

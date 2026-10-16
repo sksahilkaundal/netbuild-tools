@@ -1,4 +1,6 @@
-# Netbuild Level Shift (portable)
+# Level Shift by Netbuild
+
+© 2026 [SKAEC.COM](https://skaec.com) · MIT License · see **About** below
 
 Move up to **10 levels** up or down. Every element, group and model element hosted to those levels
 keeps its existing **X, Y, Z**. Its offset from the level changes by the opposite amount: when a level
@@ -13,22 +15,24 @@ extension that Claude and the Plot Runner already use.
 | | What | Needs |
 |---|---|---|
 | **Level Shift** ribbon button | **Runs directly inside Revit.** Same window: 10 rows, read-only highlighted current elevation, Define new level…, Check / Trial / Apply. The engine runs in Revit's own process | pyRevit only (no exe, no MCP listener) |
-| **Level Shifter App** ribbon button | Opens `LevelShifter.exe` bound to the model you clicked it from | the exe + the pyRevit MCP listener running |
-| `LevelShifter.exe` / `LevelShift.exe` | The standalone window and the command line | the pyRevit MCP listener running |
+| **Level Shift App** ribbon button | Opens `Level Shift by Netbuild.exe` bound to the model you clicked it from | the exe + the pyRevit MCP listener running |
+| `Level Shift by Netbuild.exe` / `LevelShift.exe` | The standalone window and the command line | the pyRevit MCP listener running |
 
 All three use the same engine (`level_shift/payload.py`), so the results are identical.
 
 ### Install the ribbon buttons (pyRevit)
 
-1. Download `LevelShifter-windows` from **Actions → Build Level Shifter (Windows exe)**. Its
+1. Download `LevelShift-by-Netbuild-windows` from **Actions → Build Level Shift by Netbuild (Windows)**. Its
    `pyRevit\Netbuild.extension` folder already holds the exe in `bin\`.
 2. Copy `Netbuild.extension` to a folder of your choice, for example `C:\pyRevit-Extensions\`.
 3. Register that folder with pyRevit, then **Reload**. You can do this in either of two ways:
    - **pyRevit → Settings → Custom Extension Directories**;
    - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
-4. A **Netbuild** tab appears with a **Levels** panel holding **Level Shift** and **Level Shifter App**.
+4. A **Netbuild** tab appears with two panels:
+   - **Levels**, holding **Level Shift** and **Level Shift App**;
+   - **About**, showing product info, version, requirements and license.
 
-When **Level Shifter App** can't find the exe, it asks for it once. It looks in this order:
+When **Level Shift App** can't find the exe, it asks for it once. It looks in this order:
 1. the path you picked (Shift+Click to change it);
 2. `Netbuild.extension\bin\`;
 3. `%LOCALAPPDATA%\Netbuild\LevelShifter\`.
@@ -61,7 +65,7 @@ the **Units** setting (mm or m). `3,500`, `3.5m` and `+300mm` are all accepted.
 | 1 | **Load levels** | Reads every level: name, elevation, Elevation Base, pinned, Copy/Monitor. Nothing is changed |
 | 2 | **Check (plan only)** | Lists, per level, the elements it drives and how each one is compensated. Also reports blockers: an element **borrowed by another user**, an element with **no offset parameter**, members of **model groups**. Nothing is changed |
 | 3 | **Trial run (rolls back)** | Does the whole move inside a Revit TransactionGroup and measures every element, then **rolls back**. You see exactly what Apply would do, and the model is untouched |
-| 4 | **Apply** | Does the same thing and keeps it. It is **one Undo entry** in Revit (*Netbuild Level Shift*). If any element still moved, everything is rolled back, unless you untick *Undo all if anything moves* on Setup |
+| 4 | **Apply** | Does the same thing and keeps it. It is **one Undo entry** in Revit (*Level Shift by Netbuild*). If any element still moved, everything is rolled back, unless you untick *Undo all if anything moves* on Setup |
 
 Every run writes `logs\<timestamp>_<step>.log` and `logs\<timestamp>_<step>_elements.csv`. The CSV
 has one row per element: Id, category, name, level, rule, each parameter old → new, method, drift,
@@ -151,8 +155,8 @@ Any **error** rolls the whole move back.
 
 ## Install (portable, no installer)
 
-1. Download `LevelShifter-windows` from **Actions → Build Level Shifter (Windows exe)**. It contains:
-   - `LevelShifter.exe`: the window.
+1. Download `LevelShift-by-Netbuild-windows` from **Actions → Build Level Shift by Netbuild (Windows)**. It contains:
+   - `Level Shift by Netbuild.exe`: the window.
    - `LevelShift.exe`: the command line.
 
    Put them in any folder. `settings.json` and `logs\` are created next to them. No Python is
@@ -217,3 +221,34 @@ The tests cover:
 - shape-change rollback;
 - paused, unreachable or stale Revit replies;
 - the CLI and the window.
+
+## About
+
+Every entry point has an About screen with the product name, version, publisher, requirements and
+the full license text:
+- the **About** tab in the app;
+- the **About** button in the Level Shift window;
+- **Netbuild → About** on the ribbon;
+- `LevelShift about` on the command line (`LevelShift --version` prints the version).
+
+The exes also carry this in **Properties → Details**:
+- Company: SKAEC.COM;
+- Product: Level Shift by Netbuild;
+- the version;
+- Copyright: (c) 2026 SKAEC.COM.
+
+All of it comes from one file, `level_shift/about.py`.
+
+### Requirements
+
+| To run | You need |
+|---|---|
+| **Level Shift** ribbon button (runs inside Revit) | Windows 10 / 11 64-bit · Autodesk Revit 2019 – 2026 · pyRevit 4.8 or later with its IronPython engine (the default) |
+| **Level Shift by Netbuild.exe** / **LevelShift.exe** | Windows 10 / 11 64-bit, no Python needed · Revit open with pyRevit and the Revit MCP extension, its listener running (MCP Status on) at `http://127.0.0.1:48884` |
+| From source | Python 3.9 or later with tkinter |
+| The model | A project model opened editable (not read-only) · when workshared, the moved levels and their elements not borrowed by other users · Save / Synchronize after Apply |
+
+### License
+
+MIT License. Copyright (c) 2026 SKAEC.COM. The full text is in [`LICENSE`](../LICENSE), shipped
+next to the exes and in `Netbuild.extension`.

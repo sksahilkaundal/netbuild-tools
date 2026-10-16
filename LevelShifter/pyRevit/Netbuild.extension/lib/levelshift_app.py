@@ -1,8 +1,11 @@
-"""Find and start LevelShifter.exe for the "Level Shifter App" button.  IronPython 2.7 + CPython 3."""
+"""Find and start the Level Shift by Netbuild app for the "Level Shift App" button.  IronPython 2.7 + CPython 3."""
 
 import os
 
-EXE = "LevelShifter.exe"
+from level_shift.about import PRODUCT
+
+EXE = PRODUCT + ".exe"                  # "Level Shift by Netbuild.exe"
+OLD_EXE = "LevelShifter.exe"            # 1.0 - 1.2 builds
 EXT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))    # .../Netbuild.extension
 
 
@@ -12,10 +15,11 @@ def candidates(configured="", env=None):
     out = []
     if configured:
         out.append(configured)
-    out.append(os.path.join(EXT_DIR, "bin", EXE))                         # shipped inside the extension
     local = env.get("LOCALAPPDATA")
-    if local:
-        out.append(os.path.join(local, "Netbuild", "LevelShifter", EXE))
+    for name in (EXE, OLD_EXE):
+        out.append(os.path.join(EXT_DIR, "bin", name))                    # shipped inside the extension
+        if local:
+            out.append(os.path.join(local, "Netbuild", "LevelShifter", name))
     return out
 
 

@@ -61,7 +61,7 @@ class Reply(object):
         return [l for l in self.output.splitlines() if not l.startswith("@@LS-")]
 
 
-def post(url, code, timeout, description="Netbuild Level Shift"):
+def post(url, code, timeout, description="Level Shift by Netbuild"):
     payload = {"code": code, "description": description, "use_transaction": False}
     req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
                                  headers={"Content-Type": "application/json"})
@@ -115,5 +115,5 @@ def list_docs_code(nonce):
 
 def action_code(nonce, action, match, moves=(), s=None):
     """The payload with its per-call config. ``moves``: [{"id", "name", "delta" (feet)}]."""
-    return "# ---- Netbuild Level Shift (one call)\n_LS = %s\n%s" % (
+    return "# ---- Level Shift by Netbuild (one call)\n_LS = %s\n%s" % (
         py_literal(config(nonce, action, match, moves, s)), CODE)

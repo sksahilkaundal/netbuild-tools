@@ -6,10 +6,11 @@ import sys
 import threading
 import time
 import tkinter as tk
+import webbrowser
 from tkinter import messagebox, simpledialog, ttk
 from tkinter.scrolledtext import ScrolledText
 
-from . import __version__
+from . import about
 from .core import MAX_LEVELS, MoveSpec, counterpart, define_value
 from .runner import Runner, open_folder
 from .settings import DEFAULTS, Settings
@@ -211,16 +212,18 @@ class App(object):
         self.cancel = threading.Event()
         self.levels = []
 
-        root.title("Netbuild Level Shift %s" % __version__)
+        root.title(about.title())
         root.geometry("1120x900")
         root.minsize(980, 680)
         nb = ttk.Notebook(root)
         nb.pack(fill="both", expand=True)
-        self.run_tab, self.setup_tab = ttk.Frame(nb), ttk.Frame(nb)
+        self.run_tab, self.setup_tab, self.about_tab = ttk.Frame(nb), ttk.Frame(nb), ttk.Frame(nb)
         nb.add(self.run_tab, text="  Run  ")
         nb.add(self.setup_tab, text="  Setup  ")
+        nb.add(self.about_tab, text="  About  ")
         self._build_run_tab()
         self._build_setup_tab()
+        self._build_about_tab()
         self.status = tk.StringVar(value="Open the model in Revit, then click '1. Load levels'.")
         ttk.Label(root, textvariable=self.status, anchor="w", relief="sunken").pack(fill="x")
         self._restore_last()
@@ -360,8 +363,41 @@ class App(object):
         ttk.Label(self.setup_tab, foreground="#555", justify="left", text=(
             "Revit needs pyRevit + the MCP listener (the same one the ProjectA Plot Runner and Claude use).\n"
             "Each run binds to the model whose title contains the 'Revit title contains' text (blank = active).\n"
-            "Apply is one Revit transaction group: Ctrl+Z in Revit ('Netbuild Level Shift') undoes all of it.")
+            "Apply is one Revit transaction group: Ctrl+Z in Revit ('Level Shift by Netbuild') undoes all of it.")
         ).pack(anchor="w", **PAD)
+
+    # ------------------------------------------------------------ About tab
+    def _build_about_tab(self):
+        f = ttk.Frame(self.about_tab)
+        f.pack(fill="both", expand=True, padx=14, pady=10)
+        ttk.Label(f, text=about.PRODUCT, font=("Segoe UI", 16, "bold")).pack(anchor="w")
+        ttk.Label(f, text="Version %s   |   %s   |   %s" % (about.VERSION, about.COPYRIGHT, about.WEBSITE),
+                  foreground="#555").pack(anchor="w", pady=(2, 8))
+        ttk.Label(f, text=about.DESCRIPTION, wraplength=1000, justify="left").pack(anchor="w", pady=(0, 8))
+        cols = ttk.Frame(f)
+        cols.pack(fill="x")
+        left, right = ttk.LabelFrame(cols, text="Features"), ttk.LabelFrame(cols, text="Requirements")
+        left.pack(side="left", fill="both", expand=True, padx=(0, 6))
+        right.pack(side="left", fill="both", expand=True)
+        ttk.Label(left, justify="left", wraplength=480,
+                  text="\n".join("- " + x for x in about.FEATURES)).pack(anchor="w", **PAD)
+        ttk.Label(right, justify="left", wraplength=480, text=about.requirements_text()).pack(anchor="w", **PAD)
+        lf = ttk.LabelFrame(f, text="License -- %s" % about.LICENSE_NAME)
+        lf.pack(fill="both", expand=True, pady=(8, 0))
+        self.license_box = ScrolledText(lf, height=12, wrap="word", font=("Consolas", 9))
+        self.license_box.insert("1.0", about.LICENSE_TEXT)
+        self.license_box.config(state="disabled")
+        self.license_box.pack(fill="both", expand=True)
+        bar = ttk.Frame(f)
+        bar.pack(fill="x", pady=(8, 0))
+        ttk.Button(bar, text="Copy product info", command=self._copy_about).pack(side="left", **PAD)
+        ttk.Button(bar, text="Open %s" % about.WEBSITE,
+                   command=lambda: webbrowser.open(about.WEBSITE)).pack(side="left", **PAD)
+
+    def _copy_about(self):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(about.about_text())
+        self.status.set("Product info, requirements and license copied to the clipboard.")
 
     def _apply_setup(self):
         for key, v in self.vars.items():

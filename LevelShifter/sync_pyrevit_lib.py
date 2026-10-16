@@ -11,7 +11,7 @@ import shutil
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "level_shift")
 DST = os.path.join(HERE, "pyRevit", "Netbuild.extension", "lib", "level_shift")
-SHARED = ["__init__.py", "core.py", "payload.py", "units.py"]   # IronPython 2.7 + CPython 3
+SHARED = ["__init__.py", "about.py", "core.py", "payload.py", "units.py"]   # IronPython 2.7 + CPython 3
 
 if __name__ == "__main__":
     os.makedirs(DST, exist_ok=True)

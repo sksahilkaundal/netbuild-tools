@@ -238,7 +238,7 @@ def result_checks(action, r, units, tol_mm):
         checks.append(Check("Trial", True if not drift and not r.get("errors") else None,
                             "rolled back -- the model is unchanged"))
     elif r.get("committed"):
-        checks.append(Check("Applied", True, "one Undo entry in Revit: 'Netbuild Level Shift'. "
+        checks.append(Check("Applied", True, "one Undo entry in Revit: 'Level Shift by Netbuild'. "
                                              "Save / Synchronize when happy"))
     else:
         checks.append(Check("Applied", False, "rolled back -- the model is unchanged (%s)" % (

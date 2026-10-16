@@ -58,6 +58,50 @@ LEVELS = [{"id": 1, "name": "L00", "elev": 0.0}, {"id": 2, "name": "L01", "elev"
           {"id": 3, "name": "L02", "elev": mm(7000)}, {"id": 4, "name": "L03", "elev": mm(10500)}]
 
 
+class AboutTests(unittest.TestCase):
+    def test_product_info_and_license(self):
+        from level_shift import __version__, about
+        with open(os.path.join(os.path.dirname(os.path.dirname(HERE)), "LICENSE"), encoding="utf-8") as f:
+            self.assertEqual(about.LICENSE_TEXT, f.read())            # the About screen shows the real LICENSE
+        self.assertIn("Copyright (c) 2026 SKAEC.COM", about.LICENSE_TEXT)
+        self.assertEqual(about.PRODUCT, "Level Shift by Netbuild")
+        self.assertEqual(about.title("B003"), "Level Shift by Netbuild %s -- B003" % __version__)
+        text = about.about_text()
+        for want in ("Level Shift by Netbuild  version " + __version__, u"\u00a9 2026 SKAEC.COM",
+                     "Requirements", "Autodesk Revit 2019 - 2026", "pyRevit 4.8", "Python 3.9",
+                     "License: MIT License", "Permission is hereby granted"):
+            self.assertIn(want, text)
+
+    def test_cli_about_and_version(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.assertEqual(cli.main(["about"]), 0)
+        self.assertIn("SKAEC.COM", buf.getvalue())
+        self.assertIn("Requirements", buf.getvalue())
+        buf = io.StringIO()
+        with redirect_stdout(buf), self.assertRaises(SystemExit):
+            cli.main(["--version"])
+        self.assertTrue(buf.getvalue().startswith("Level Shift by Netbuild 1."))
+
+    def test_exe_version_resource(self):
+        sys.path.insert(0, os.path.dirname(HERE))
+        import make_version_file
+        text = make_version_file.render("Level Shift by Netbuild.exe")
+        seen = {}
+
+        def rec(name):
+            return lambda *a, **k: seen.setdefault(name, []).append((a, k)) or (name, a, k)
+        ns = dict((n, rec(n)) for n in ("VSVersionInfo", "FixedFileInfo", "StringFileInfo", "StringTable",
+                                        "StringStruct", "VarFileInfo", "VarStruct"))
+        eval(compile(text.split("\n", 1)[1], "version_info", "eval"), ns)  # what PyInstaller does with it
+        fields = dict(a for a, k in seen["StringStruct"])
+        self.assertEqual(fields["CompanyName"], "SKAEC.COM")
+        self.assertEqual(fields["ProductName"], "Level Shift by Netbuild")
+        self.assertEqual(fields["LegalCopyright"], "(c) 2026 SKAEC.COM -- MIT License")
+        self.assertEqual(fields["OriginalFilename"], "Level Shift by Netbuild.exe")
+        self.assertEqual(seen["FixedFileInfo"][0][1]["filevers"][:2], (1, 3))
+
+
 class ResolveTests(unittest.TestCase):
     def labels(self, checks, ok):
         return [c.label for c in checks if c.ok is ok]
@@ -155,7 +199,7 @@ class WorkflowTests(Fixture):
         res = self.r.run("trial", None, [MoveSpec("L01", "by", 300), MoveSpec("L02", "to", 6850)])
         self.assertTrue(res.ok, self.explain(res))
         self.assertTrue(self.unchanged())
-        self.assertEqual(self.doc.groups, [("Netbuild Level Shift", "rolled back")])
+        self.assertEqual(self.doc.groups, [("Level Shift by Netbuild", "rolled back")])
         self.assertIn("Every element kept its X, Y, Z", [c.label for c in res.checks])
         self.assertEqual([lv["name"] for lv in res.info["result"]["levels_after"]], ["L01", "L02"])
         self.assertTrue(os.path.isfile(res.info["rows_csv"]))
@@ -165,7 +209,7 @@ class WorkflowTests(Fixture):
         self.assertTrue(res.ok, self.explain(res))
         self.assertEqual((self.elev("L01"), self.elev("L02")), (3800, 6850))
         self.assertEqual(self.moved(), {})
-        self.assertEqual(self.doc.groups, [("Netbuild Level Shift", "assimilated")])
+        self.assertEqual(self.doc.groups, [("Level Shift by Netbuild", "assimilated")])
         # the offsets carry the opposite of each level's move
         self.assertEqual(self.off("wall L01-L02", "WALL_BASE_OFFSET"), -300)
         self.assertEqual(self.off("wall L01-L02", "WALL_TOP_OFFSET"), 150)
@@ -381,6 +425,8 @@ class GuiTests(Fixture):
                     root.update()
                     time.sleep(0.02)
                 root.update()
+            self.assertTrue(root.title().startswith("Level Shift by Netbuild 1."))
+            self.assertIn("Copyright (c) 2026 SKAEC.COM", app.license_box.get("1.0", "end"))
             app.do_levels()
             wait()
             self.assertEqual(len(app.levels), 6, app.checks.get("1.0", "end"))

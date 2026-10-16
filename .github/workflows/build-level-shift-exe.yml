@@ -1,4 +1,4 @@
-name: Build Level Shifter (Windows exe)
+name: Build Level Shift by Netbuild (Windows)
 
 on:
   push:
@@ -24,28 +24,34 @@ jobs:
       - name: Unit tests (Windows, includes the window test)
         run: python -m unittest discover -s LevelShifter/tests -v
 
-      - name: Build LevelShifter.exe (window) and LevelShift.exe (command line)
+      - name: Build "Level Shift by Netbuild.exe" (window) and LevelShift.exe (command line)
         working-directory: LevelShifter
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name LevelShifter LevelShifter.pyw
-          pyinstaller --noconfirm --onefile --console --name LevelShift LevelShift_cli.py
+          python make_version_file.py version_window.txt "Level Shift by Netbuild.exe"
+          python make_version_file.py version_cli.txt LevelShift.exe
+          pyinstaller --noconfirm --onefile --windowed --name "Level Shift by Netbuild" --version-file version_window.txt LevelShifter.pyw
+          pyinstaller --noconfirm --onefile --console --name LevelShift --version-file version_cli.txt LevelShift_cli.py
 
       - name: Smoke test the frozen exe
         run: python LevelShifter/tests/smoke_exe.py LevelShifter/dist/LevelShift.exe
 
-      - name: Package (exes + pyRevit extension with the exe in its bin folder)
+      - name: Package (app + pyRevit extension with the app in its bin folder)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force pkg/LevelShifter, pkg/pyRevit | Out-Null
-          Copy-Item LevelShifter/dist/LevelShifter.exe, LevelShifter/dist/LevelShift.exe, LevelShifter/README.md pkg/LevelShifter/
+          $app = "pkg/Level Shift by Netbuild"
+          $ext = "pkg/pyRevit/Netbuild.extension"
+          New-Item -ItemType Directory -Force $app, pkg/pyRevit | Out-Null
+          Copy-Item "LevelShifter/dist/Level Shift by Netbuild.exe", LevelShifter/dist/LevelShift.exe, LevelShifter/README.md, LICENSE $app/
           Copy-Item -Recurse LevelShifter/pyRevit/Netbuild.extension pkg/pyRevit/
-          New-Item -ItemType Directory -Force pkg/pyRevit/Netbuild.extension/bin | Out-Null
-          Copy-Item LevelShifter/dist/LevelShifter.exe, LevelShifter/dist/LevelShift.exe pkg/pyRevit/Netbuild.extension/bin/
+          New-Item -ItemType Directory -Force "$ext/bin" | Out-Null
+          Copy-Item "LevelShifter/dist/Level Shift by Netbuild.exe", LevelShifter/dist/LevelShift.exe "$ext/bin/"
+          Copy-Item LICENSE $ext/
           Get-ChildItem pkg -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
           Get-ChildItem pkg -Recurse -File | Format-Table FullName, Length
+          (Get-Item "$app/Level Shift by Netbuild.exe").VersionInfo | Format-List CompanyName, ProductName, ProductVersion, LegalCopyright
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LevelShifter-windows
+          name: LevelShift-by-Netbuild-windows
           path: pkg/
           retention-days: 90
