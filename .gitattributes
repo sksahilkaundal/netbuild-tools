@@ -1,3 +1,5 @@
 *.bat text eol=crlf
 *.py text eol=lf
 *.pyw text eol=lf
+# scripts/ mirrors the Netbuild Drive folder byte for byte (CRLF): no line-ending conversion
+scripts/** -text -eol
