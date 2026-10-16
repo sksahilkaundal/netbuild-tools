@@ -1,5 +1,6 @@
 @echo off
-rem Revit MCP Remote - serve the Revit MCP Router to Claude on the web through a Cloudflare quick tunnel.
+rem Remote Router by Netbuild - serve Revit MCP Router by Netbuild to Claude on the web through a Cloudflare quick tunnel.
+title Remote Router by Netbuild
 cd /d "%~dp0"
 set "PY=py -3.14"
 if defined RMR_PYTHON set "PY=%RMR_PYTHON%"

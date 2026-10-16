@@ -1,4 +1,4 @@
-# Running Revit MCP Remote on the Work PC (the above-board way)
+# Running Remote Router by Netbuild on the Work PC (the above-board way)
 
 You can run the connector on the Work PC. The one condition is that it's done with
 your IT/security team's awareness, not around them. A stable **named Cloudflare
@@ -14,7 +14,7 @@ This doc has two parts: what to send IT, and the setup once they say yes.
 > Hi [IT/security],
 >
 > I'd like to drive Revit on my work workstation from Claude (Anthropic) using a small
-> local tool (Revit MCP Remote). It runs only on my machine and exposes a single Revit
+> local tool (Remote Router by Netbuild). It runs only on my machine and exposes a single Revit
 > automation endpoint. To reach it from Claude's cloud I'd use a **named Cloudflare
 > Tunnel** (outbound only; no inbound firewall change), and I'm happy to put it behind
 > **Cloudflare Access with our SSO** so only I can reach it.
@@ -35,7 +35,7 @@ instead — the connector just needs some approved public HTTPS URL that reaches
 
 On the Work PC:
 
-1. Make sure the local Revit MCP Router already works here (Claude Code + pyRevit + the
+1. Make sure the local Revit MCP Router by Netbuild already works here (Claude Code + pyRevit + the
    MCP connector add-in; `py -3.14` with `mcp[cli]<2` + `httpx`).
 2. The `RevitMcpRemote` folder syncs here via Drive -> OneDrive; keep it next to
    `RevitMcpRouter`.

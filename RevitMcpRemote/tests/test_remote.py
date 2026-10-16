@@ -16,6 +16,7 @@ import sys
 import tempfile
 import threading
 import time
+import unittest
 from urllib.parse import parse_qs, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -95,7 +96,8 @@ def main():
     # 2. discovery uses the PUBLIC host (tunnel) and https
     r = c.get("/.well-known/oauth-protected-resource", headers={"Host": "abc.trycloudflare.com"})
     check("2 resource metadata", r.json()["authorization_servers"] == ["https://abc.trycloudflare.com"]
-          and r.json()["resource"] == "https://abc.trycloudflare.com/mcp", r.text)
+          and r.json()["resource"] == "https://abc.trycloudflare.com/mcp"
+          and r.json()["resource_name"] == "Remote Router by Netbuild", r.text)
     r = c.get("/.well-known/oauth-authorization-server/mcp", headers={"Host": "abc.trycloudflare.com"})
     check("2b AS metadata", r.json()["token_endpoint"] == "https://abc.trycloudflare.com/token", r.text)
 
@@ -112,6 +114,9 @@ def main():
          "code_challenge_method": "S256", "state": "xyz", "scope": "revit"}
     r = c.get("/authorize", params=q)
     check("4 sign-in page", r.status_code == 200 and "passphrase" in r.text, r.status_code)
+    check("4a sign-in page branding", "<h1>Remote Router by Netbuild</h1>" in r.text
+          and "<title>Remote Router by Netbuild - sign in</title>" in r.text
+          and "&copy; 2026 SKAEC.COM" in r.text, r.text)
     r = c.get("/authorize", params=dict(q, code_challenge_method="plain"))
     check("4b plain PKCE refused", r.status_code == 400, r.status_code)
     r = c.post("/authorize", data=dict(q, passphrase="nope"))
@@ -208,6 +213,13 @@ def main():
 
     print("\nALL PASSED" if not failures else "\nFAILED: %s" % ", ".join(failures))
     return 1 if failures else 0
+
+
+class EndToEnd(unittest.TestCase):
+    """Lets `python -m unittest discover -s tests` run the checks above."""
+
+    def test_end_to_end(self):
+        self.assertEqual(main(), 0, "FAILED: %s" % ", ".join(failures))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Revit MCP Remote - auth gate in front of the MCP endpoint.
+Remote Router by Netbuild - auth gate in front of the MCP endpoint.
 
 A minimal OAuth 2.1 authorisation server (RFC 8414 metadata, RFC 7591 dynamic
 client registration, PKCE S256 only, refresh-token rotation) plus RFC 9728
@@ -29,6 +29,8 @@ from urllib.parse import urlencode, urlparse
 
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+
+import remote_about
 
 ACCESS_TTL = 3600                 # 1 h
 REFRESH_TTL = 30 * 24 * 3600      # 30 days
@@ -193,7 +195,7 @@ class OAuthGate(object):
             "authorization_servers": [base],
             "bearer_methods_supported": ["header"],
             "scopes_supported": ["revit"],
-            "resource_name": "Revit MCP Remote",
+            "resource_name": remote_about.PRODUCT,
         })
 
     def as_metadata(self, request: Request) -> JSONResponse:
@@ -257,20 +259,24 @@ class OAuthGate(object):
                          for k, v in p.items() if k != "passphrase")
         err = '<p class="err">%s</p>' % html.escape(error) if error else ""
         redirect_host = html.escape(urlparse(p.get("redirect_uri", "")).netloc)
+        product = html.escape(remote_about.PRODUCT)
         body = """<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Revit MCP Remote - sign in</title>
+<title>%s - sign in</title>
 <style>body{font-family:Segoe UI,system-ui,sans-serif;background:#f4f5f7;margin:0;padding:40px 16px}
 .card{max-width:420px;margin:auto;background:#fff;border-radius:10px;padding:28px;box-shadow:0 2px 10px #0002}
 h1{font-size:20px;margin:0 0 6px}p{color:#444;font-size:14px}.err{color:#b00020}
 input[type=password]{width:100%%;box-sizing:border-box;padding:10px;font-size:15px;margin:8px 0 16px}
-button{background:#1f4e79;color:#fff;border:0;border-radius:6px;padding:10px 18px;font-size:15px;cursor:pointer}</style>
-</head><body><div class="card"><h1>Revit MCP Remote</h1>
+button{background:#1f4e79;color:#fff;border:0;border-radius:6px;padding:10px 18px;font-size:15px;cursor:pointer}
+.foot{color:#888;font-size:12px;margin:20px 0 0}</style>
+</head><body><div class="card"><h1>%s</h1>
 <p><b>%s</b> (%s) wants to drive Revit on this PC.</p>%s
 <form method="post" action="/authorize">%s
 <label>Passphrase<input type="password" name="passphrase" autofocus autocomplete="current-password"></label>
-<button type="submit">Allow</button></form></div></body></html>""" % (
-            html.escape(client.get("client_name", "?")), redirect_host, err, hidden)
+<button type="submit">Allow</button></form>
+<p class="foot">&copy; %s %s</p></div></body></html>""" % (
+            product, product, html.escape(client.get("client_name", "?")), redirect_host, err, hidden,
+            html.escape(remote_about.YEAR), html.escape(remote_about.PUBLISHER))
         return HTMLResponse(body, status_code=status, headers={"Cache-Control": "no-store",
                                                                 "X-Frame-Options": "DENY"})
 

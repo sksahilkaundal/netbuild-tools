@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Revit MCP Remote - the Revit MCP Router, reachable from Claude on the web.
+Remote Router by Netbuild - Revit MCP Router by Netbuild, reachable from Claude on the web.
+(c) 2026 SKAEC.COM. All rights reserved. Proprietary - see LICENSE.txt; product info in remote_about.py.
 
 Same tools, same routing as the local router (it loads bridge_core.build_server()
 from the RevitMcpRouter folder, so revit_list_sessions / revit_select_session /
@@ -19,6 +20,8 @@ Usage (Windows, from this folder):
     py -3.14 revit_mcp_remote.py --tunnel quick     serve + print the connector URL
     py -3.14 revit_mcp_remote.py --check            list tools, test routing, exit
     py -3.14 revit_mcp_remote.py --revoke-all       sign every client out
+    py -3.14 revit_mcp_remote.py --about            product info, requirements, licence
+    py -3.14 revit_mcp_remote.py --version
 
 Privacy hardening (useful on a managed / Work PC):
     --no-exec       hide the arbitrary-code tools (execute_revit_code, revit_run_on_documents)
@@ -49,8 +52,9 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 import oauth_gate  # noqa: E402
+import remote_about  # noqa: E402
 
-VERSION = "0.5.0"
+VERSION = remote_about.VERSION
 DEFAULT_PORT = 8765
 
 # Tools that run an arbitrary code string inside Revit. --no-exec hides these from the
@@ -65,8 +69,14 @@ ROUTER_DIR_CANDIDATES = (
 )
 
 
+def _safe(text, stream):
+    """text the stream can print (a console without the (c) sign gets '?')."""
+    enc = getattr(stream, "encoding", None) or "utf-8"
+    return text.encode(enc, "replace").decode(enc)
+
+
 def _log(msg):
-    sys.stderr.write("[revit_mcp_remote] %s\n" % msg)
+    sys.stderr.write(_safe("[revit_mcp_remote] %s\n" % msg, sys.stderr))
     sys.stderr.flush()
 
 
@@ -348,9 +358,9 @@ def run_multi(a, router_dir, n):
             route_dns(exe, a.tunnel_name, named_hosts)
             named_config = write_ingress_config(a.tunnel_name, named_hosts, a.port)
             tunnels.append(start_named_tunnel_multi(exe, a.tunnel_name, named_config, named_hosts))
-        _log("Revit MCP Remote %s - %d independent slots on ports %d-%d. Each connector URL above "
+        _log("%s - %d independent slots on ports %d-%d. Each connector URL above "
              "is a separate Revit selection; set each with revit_select_session in its own chat."
-             % (VERSION, n, a.port, a.port + n - 1))
+             % (remote_about.title(), n, a.port, a.port + n - 1))
         if a.tunnel == "none":
             for k in range(n):
                 _log("  slot %d: http://127.0.0.1:%d/mcp (bring your own tunnel)" % (k + 1, a.port + k))
@@ -374,7 +384,12 @@ def run_multi(a, router_dir, n):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Revit MCP Remote %s" % VERSION)
+    ap = argparse.ArgumentParser(description=(
+        "%s %s -- Revit MCP Router by Netbuild served to Claude on the web as a remote MCP connector. %s"
+        % (remote_about.PRODUCT, VERSION, remote_about.COPYRIGHT)),
+        epilog="%s  |  %s (--about)" % (remote_about.WEBSITE, remote_about.LICENSE_NAME))
+    ap.add_argument("--version", action="version", version="%s %s" % (remote_about.PRODUCT, VERSION))
+    ap.add_argument("--about", action="store_true", help="product info, requirements and licence, then exit")
     ap.add_argument("--setup", action="store_true", help="set the passphrase and a new static token")
     ap.add_argument("--rotate-token", action="store_true", help="replace the static bearer token only")
     ap.add_argument("--revoke-all", action="store_true", help="forget every OAuth client and token")
@@ -402,6 +417,9 @@ def main(argv=None):
                     help="run N (1-10) independent servers, each its own connector URL and its own "
                          "selected Revit, so N Claude chats can each drive a different Revit at once")
     a = ap.parse_args(argv)
+    if a.about:
+        print(_safe(remote_about.about_text(), sys.stdout))
+        return 0
 
     # --state-dir must be in place before the Store reads/writes the passphrase file.
     if a.state_dir:
@@ -461,8 +479,9 @@ def main(argv=None):
     warm_router(bridge)
 
     import uvicorn
-    _log("Revit MCP Remote %s on http://127.0.0.1:%d (%d tools, router: %s)"
-         % (VERSION, a.port, len(mcp._tool_manager._tools), router_dir or a.bridge_module))
+    _log("%s on http://127.0.0.1:%d (%d tools, router: %s)  %s"
+         % (remote_about.title(), a.port, len(mcp._tool_manager._tools), router_dir or a.bridge_module,
+            remote_about.COPYRIGHT))
     try:
         # timeout_keep_alive holds the edge<->origin connection open between tool calls so a
         # burst of calls in one chat reuses it instead of re-handshaking each time.

@@ -1,4 +1,4 @@
-# Revit MCP Remote - quick start
+# Remote Router by Netbuild - quick start
 
 Goal: drive Revit from Claude on the web, with everything running on **one PC you
 are free to use** (your Personal PC). The Work PC is not involved.
@@ -15,7 +15,7 @@ So: open your models on the **Personal PC** and run everything there.
 
 ## One-time setup (Personal PC)
 
-1. This PC already needs the local Revit MCP Router working: Claude Code + pyRevit +
+1. This PC already needs the local Revit MCP Router by Netbuild working: Claude Code + pyRevit +
    the Revit MCP connector add-in, and `py -3.14` with `mcp[cli]<2` + `httpx`.
 2. The `RevitMcpRemote` folder syncs here via Google Drive -> OneDrive
    (`...\Netbuild\scripts\RevitMcpRemote`). Make sure it sits next to `RevitMcpRouter`.
