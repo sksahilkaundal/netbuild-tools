@@ -2,11 +2,11 @@
 """Level Shift by Netbuild -- open the app window ("Level Shift by Netbuild.exe"), bound to this model.
 
 The app talks to Revit through the pyRevit MCP listener -- keep MCP Status running.
-Shift+Click: choose where the exe is.  (c) 2026 SKAEC.COM -- MIT License.
+Shift+Click: choose where the exe is.  (c) 2026 Netbuild. All rights reserved. https://skaec.com
 """
 
 __title__ = "Level Shift\nApp"
-__author__ = "Netbuild -- SKAEC.COM"
+__author__ = "Netbuild -- skaec.com"
 
 import os
 

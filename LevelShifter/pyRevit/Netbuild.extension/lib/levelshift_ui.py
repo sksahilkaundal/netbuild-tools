@@ -141,14 +141,12 @@ _ABOUT = '''<Window {ns}
     </StackPanel>
     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
       <Button x:Name="copy_btn" Content="Copy product info" Padding="10,3" Margin="0,0,6,0"/>
+      <Button x:Name="licence_btn" Content="Licence" Padding="10,3" Margin="0,0,6,0"/>
       <Button x:Name="web_btn" Padding="10,3" Margin="0,0,6,0"/>
       <Button x:Name="close_btn" Content="Close" Padding="10,3" IsCancel="True" IsDefault="True"/>
     </StackPanel>
+    <TextBlock x:Name="licence_line_tb" DockPanel.Dock="Bottom" TextWrapping="Wrap" Margin="0,8,0,0"/>
     <Grid Margin="0,10,0,0">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="*"/>
-      </Grid.RowDefinitions>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="*"/>
@@ -159,17 +157,41 @@ _ABOUT = '''<Window {ns}
       <GroupBox Grid.Row="0" Grid.Column="1" Header="Requirements" Margin="0,0,0,6">
         <TextBlock x:Name="req_tb" TextWrapping="Wrap" Margin="4"/>
       </GroupBox>
-      <GroupBox x:Name="license_gb" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
-        <TextBox x:Name="license_tb" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
-                 VerticalScrollBarVisibility="Auto" BorderThickness="0"/>
-      </GroupBox>
     </Grid>
+  </DockPanel>
+</Window>'''
+
+
+_LICENCE = '''<Window {ns}
+        Title="Licence -- {product}" Width="760" Height="720" MinWidth="560" MinHeight="480"
+        WindowStartupLocation="CenterOwner" FontFamily="Segoe UI" FontSize="12" ShowInTaskbar="False">
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Top">
+      <TextBlock Text="Licence" FontSize="20" FontWeight="Bold"/>
+      <TextBlock x:Name="product_tb" Margin="0,2,0,0"/>
+      <TextBlock x:Name="kind_tb" FontWeight="Bold" Margin="0,8,0,0"/>
+      <TextBlock x:Name="owner_tb" Foreground="#555555"/>
+      <TextBlock x:Name="key_tb" Margin="0,2,0,8"/>
+    </StackPanel>
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+      <Button x:Name="copy_btn" Content="Copy licence" Padding="10,3" Margin="0,0,6,0"/>
+      <Button x:Name="web_btn" Padding="10,3" Margin="0,0,6,0"/>
+      <Button x:Name="close_btn" Content="Close" Padding="10,3" IsCancel="True" IsDefault="True"/>
+    </StackPanel>
+    <GroupBox x:Name="license_gb">
+      <TextBox x:Name="license_tb" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
+               VerticalScrollBarVisibility="Auto" BorderThickness="0"/>
+    </GroupBox>
   </DockPanel>
 </Window>'''
 
 
 def about_xaml(product):
     return _ABOUT.format(ns=_NS, product=product)
+
+
+def licence_xaml(product):
+    return _LICENCE.format(ns=_NS, product=product)
 
 
 def window_xaml(count):

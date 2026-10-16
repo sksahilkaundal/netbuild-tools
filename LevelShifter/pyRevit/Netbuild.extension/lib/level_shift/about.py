@@ -10,11 +10,14 @@ BRAND = "Netbuild"
 NAME = "Level Shift"
 PRODUCT = NAME + " by " + BRAND                      # "Level Shift by Netbuild"
 VERSION = __version__
-PUBLISHER = "SKAEC.COM"
+PUBLISHER = BRAND                                    # owner of the product
 WEBSITE = "https://skaec.com"
 YEAR = "2026"
-COPYRIGHT = u"\u00a9 %s %s" % (YEAR, PUBLISHER)       # (c) 2026 SKAEC.COM
-LICENSE_NAME = "MIT License"
+OWNER = BRAND
+COPYRIGHT = u"\u00a9 %s %s. All rights reserved." % (YEAR, OWNER)    # (c) 2026 Netbuild. All rights reserved.
+LICENSE_NAME = "Netbuild Software Licence Agreement (proprietary)"
+LICENSE_KIND = "Proprietary software -- owned by " + OWNER
+LICENCE_KEY = "No licence key required for this product."
 
 DESCRIPTION = ("Moves up to 10 levels up or down in a Revit model while every element, group and model "
                "element hosted to them keeps its X, Y, Z: each offset from a moved level changes by the "
@@ -47,27 +50,55 @@ REQUIREMENTS = [
     ]),
 ]
 
-LICENSE_TEXT = u"""MIT License
+LICENSE_TEXT = u"""Netbuild Software Licence Agreement
 
-Copyright (c) 2026 SKAEC.COM
+Copyright (c) 2026 Netbuild. All rights reserved.
+Website: https://skaec.com
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This agreement covers every Netbuild software product -- including Level Shift by
+Netbuild, Plot Runner by Netbuild, Revit MCP Router by Netbuild, Remote Router by
+Netbuild and Revit Status by Netbuild -- together with its updates and documentation
+(the "Software").
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Ownership. The Software is proprietary. It is owned by Netbuild and protected by
+   copyright and other intellectual property laws. It is licensed, not sold.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. Licence. Netbuild grants you a non-exclusive, non-transferable licence to install
+   and use the Software for your own work, on the terms under which you obtained it
+   from Netbuild or https://skaec.com (including any licence key, number of computers
+   and licence period).
+
+3. Restrictions. You may not: (a) copy the Software, except to install it and to keep
+   one backup; (b) sell, rent, lease, lend, sublicense, publish or otherwise
+   distribute the Software or its licence keys; (c) modify, adapt, decompile,
+   disassemble or reverse engineer the Software, or bypass or disable its licence
+   checks, except where the law expressly allows it; (d) remove or alter any
+   copyright, trademark or licence notice.
+
+4. Licence keys. Where the Software requires a licence key, the key is valid only for
+   the computer(s) and period it was issued for. Moving a licence to another computer
+   requires a transfer from Netbuild. Netbuild may revoke a licence key if this
+   agreement is breached.
+
+5. Termination. This licence ends automatically if you breach this agreement. You
+   must then stop using the Software and delete all copies.
+
+6. No warranty. The Software is provided "as is", without warranty of any kind,
+   express or implied, including fitness for a particular purpose. You are
+   responsible for checking its results and for keeping backups of your models and
+   files.
+
+7. Limitation of liability. To the extent permitted by law, Netbuild is not liable
+   for any indirect, incidental or consequential damages, or for loss of data, of
+   work in Autodesk Revit models, of profit or of business, arising from the use of
+   or inability to use the Software.
+
+8. Third parties. Autodesk and Revit are registered trademarks of Autodesk, Inc.
+   pyRevit, the Model Context Protocol SDK and other third-party components are used
+   under their own licences. Netbuild is not affiliated with or endorsed by Autodesk
+   or Anthropic.
+
+Contact: https://skaec.com
 """
 
 
@@ -88,7 +119,13 @@ def about_text(license=True):
     """The whole About screen as plain text."""
     parts = [u"%s  version %s" % (PRODUCT, VERSION), COPYRIGHT + u"  |  " + WEBSITE, u"", DESCRIPTION, u"",
              u"Features"] + [u"  - " + f for f in FEATURES] + [u"", u"Requirements", requirements_text(), u"",
-                                                                u"License: " + LICENSE_NAME]
+                                                                u"Licence: %s -- owned by %s, %s" % (LICENSE_NAME, OWNER, WEBSITE)]
     if license:
         parts += [u"", LICENSE_TEXT.rstrip()]
     return u"\n".join(parts)
+
+
+def licence_text():
+    """The Licence page as plain text: product, ownership, website, key status and the full agreement."""
+    return u"\n".join([u"%s  version %s" % (PRODUCT, VERSION), LICENSE_KIND, u"Website: " + WEBSITE,
+                       LICENCE_KEY, COPYRIGHT, u"", LICENSE_TEXT.rstrip()])

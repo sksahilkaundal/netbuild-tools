@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""About the Netbuild tools: product info, version, requirements and license.  (c) 2026 SKAEC.COM"""
+"""About the Netbuild tools: product info, version, requirements and licence.  (c) 2026 Netbuild"""
 
 __title__ = "About"
-__author__ = "Netbuild -- SKAEC.COM"
+__author__ = "Netbuild -- skaec.com"
 
 import netbuild_about
 

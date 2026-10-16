@@ -1,4 +1,4 @@
-"""Console entry point (LevelShift.exe): setup | models | levels | plan | trial | apply."""
+"""Console entry point (LevelShift.exe): setup | models | levels | plan | trial | apply | about | license."""
 import os
 import sys
 

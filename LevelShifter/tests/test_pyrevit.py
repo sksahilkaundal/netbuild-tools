@@ -22,6 +22,7 @@ DIRECT = os.path.join(PANEL, "Level Shift.pushbutton", "script.py")
 APP = os.path.join(PANEL, "Level Shift App.pushbutton", "script.py")
 APP_CONFIG = os.path.join(PANEL, "Level Shift App.pushbutton", "config.py")
 ABOUT = os.path.join(EXT, "Netbuild.tab", "About.panel", "About.pushbutton", "script.py")
+LICENCE = os.path.join(EXT, "Netbuild.tab", "About.panel", "Licence.pushbutton", "script.py")
 APP_EXE = "Level Shift by Netbuild.exe"
 sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
@@ -36,7 +37,7 @@ import levelshift_ui  # noqa: E402
 sys.path.insert(0, os.path.join(ROOT))
 from sync_pyrevit_lib import SHARED  # noqa: E402
 
-IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DIRECT, APP, APP_CONFIG, ABOUT] +
+IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DIRECT, APP, APP_CONFIG, ABOUT, LICENCE] +
                     [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py",
                                                             "netbuild_about.py")])
 
@@ -85,14 +86,17 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertIn("New elevation (mm)", ET.tostring(dlg, encoding="unicode"))
 
     def test_icons_and_titles(self):
-        for script_path in (DIRECT, APP, ABOUT):
+        for script_path in (DIRECT, APP, ABOUT, LICENCE):
             with open(os.path.join(os.path.dirname(script_path), "icon.png"), "rb") as f:
                 self.assertEqual(f.read(8), b"\x89PNG\r\n\x1a\n")
             with open(script_path, encoding="utf-8") as f:
                 src = f.read()
-            self.assertIn("SKAEC.COM", src, script_path)              # every button names its publisher
+            self.assertIn('__author__ = "Netbuild -- skaec.com"', src, script_path)   # every button names its owner
+            self.assertNotIn("SKAEC.COM", src, script_path)
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "About"])
+        with open(os.path.join(EXT, "Netbuild.tab", "About.panel", "bundle.yaml")) as f:
+            self.assertEqual(f.read().split(), ["layout:", "-", "About", "-", "Licence"])
 
     def test_find_exe_and_args(self):
         tmp = tempfile.mkdtemp()
@@ -243,12 +247,23 @@ class ButtonTests(unittest.TestCase):
         from level_shift import about
         self.assertEqual(win.Title, "About Level Shift by Netbuild")
         self.assertEqual(win.product_tb.Text, "Level Shift by Netbuild")
-        self.assertIn(u"\u00a9 2026 SKAEC.COM", win.version_tb.Text)
+        self.assertIn(u"\u00a9 2026 Netbuild. All rights reserved.", win.version_tb.Text)
         self.assertIn(about.VERSION, win.version_tb.Text)
         self.assertIn("Autodesk Revit 2019 - 2026", win.req_tb.Text)
         self.assertIn("pyRevit 4.8", win.req_tb.Text)
+        self.assertEqual(win.licence_line_tb.Text, "Licence: Netbuild Software Licence Agreement (proprietary) -- "
+                                                   "Proprietary software -- owned by Netbuild. See Licence.")
+
+    def check_licence(self, win):
+        from level_shift import about
+        self.assertEqual(win.Title, "Licence -- Level Shift by Netbuild")
+        self.assertEqual(win.product_tb.Text, "Level Shift by Netbuild  version " + about.VERSION)
+        self.assertEqual(win.kind_tb.Text, "Proprietary software -- owned by Netbuild")
+        self.assertEqual(win.owner_tb.Text, u"\u00a9 2026 Netbuild. All rights reserved.   |   "
+                                            u"Website: https://skaec.com")
+        self.assertEqual(win.key_tb.Text, "No licence key required for this product.")
+        self.assertEqual(win.license_gb.Header, "Netbuild Software Licence Agreement (proprietary)")
         self.assertEqual(win.license_tb.Text, about.LICENSE_TEXT)
-        self.assertEqual(win.license_gb.Header, "License -- MIT License")
 
     def test_about_button(self):
         st = pyrevit_stubs.install(self.doc)
@@ -257,9 +272,27 @@ class ButtonTests(unittest.TestCase):
         self.check_about(win)
         win.copy_btn.click()
         self.assertIn("Level Shift by Netbuild  version", st.clipboard[-1])
-        self.assertIn("Permission is hereby granted", st.clipboard[-1])
+        self.assertIn("Netbuild Software Licence Agreement\n\nCopyright (c) 2026 Netbuild", st.clipboard[-1])
         win.web_btn.click()
         self.assertEqual(st.started[-1], "https://skaec.com")
+        win.licence_btn.click()                                           # About -> Licence
+        lic = pyrevit_stubs.WPFWindow.shown[-1]
+        self.check_licence(lic)
+        self.assertIs(lic.Owner, win)
+
+    def test_licence_button(self):
+        from level_shift import about
+        st = pyrevit_stubs.install(self.doc)
+        runpy.run_path(LICENCE, run_name="__main__")
+        win = pyrevit_stubs.WPFWindow.shown[-1]
+        self.check_licence(win)
+        win.copy_btn.click()
+        self.assertEqual(st.clipboard[-1], about.LICENSE_TEXT)
+        self.assertEqual(win.copy_btn.Content, "Copied")
+        win.web_btn.click()
+        self.assertEqual(st.started[-1], "https://skaec.com")
+        win.close_btn.click()
+        self.assertTrue(win.closed)
 
     def test_level_shift_window_title_and_about(self):
         pyrevit_stubs.install(self.doc)
