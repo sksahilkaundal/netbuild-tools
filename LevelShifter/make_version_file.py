@@ -42,7 +42,7 @@ def version_tuple(v):
 def render(exe_name):
     return TEMPLATE.format(nums=version_tuple(about.VERSION), company=about.PUBLISHER, product=about.PRODUCT,
                            version=about.VERSION, internal=os.path.splitext(exe_name)[0],
-                           copyright=about.COPYRIGHT.replace(u"\u00a9", "(c)") + " -- " + about.LICENSE_NAME,
+                           copyright=about.COPYRIGHT.replace(u"\u00a9", "(c)"),
                            original=exe_name, comments=about.WEBSITE)
 
 

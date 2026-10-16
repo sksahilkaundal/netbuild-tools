@@ -1,6 +1,6 @@
 # Level Shift by Netbuild
 
-© 2026 [SKAEC.COM](https://skaec.com) · MIT License · see **About** below
+© 2026 Netbuild. All rights reserved. · Proprietary software owned by Netbuild · [skaec.com](https://skaec.com) · see **Licence** below
 
 Move up to **10 levels** up or down. Every element, group and model element hosted to those levels
 keeps its existing **X, Y, Z**. Its offset from the level changes by the opposite amount: when a level
@@ -30,7 +30,7 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
    - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
 4. A **Netbuild** tab appears with two panels:
    - **Levels**, holding **Level Shift** and **Level Shift App**;
-   - **About**, showing product info, version, requirements and license.
+   - **About**, holding **About** (product info, version, requirements) and **Licence** (the licensing page).
 
 When **Level Shift App** can't find the exe, it asks for it once. It looks in this order:
 1. the path you picked (Shift+Click to change it);
@@ -181,6 +181,8 @@ LevelShift apply --by "L01=+300" --to "Roof=14.2m"        :: do it, keep it (one
 LevelShift apply --by "L03=-150" --keep-drift             :: keep even if an element is listed as moved
 LevelShift --model T00O-ZZZ-BM-950001 levels              :: bind to a model by title
 LevelShift setup --set tolerance_mm=0.5                   :: settings
+LevelShift about                                          :: product info, requirements
+LevelShift license                                        :: the licence: owner, website, full agreement
 ```
 
 ## Settings (Setup tab / `settings.json`)
@@ -224,18 +226,20 @@ The tests cover:
 
 ## About
 
-Every entry point has an About screen with the product name, version, publisher, requirements and
-the full license text:
+Every entry point has an About screen with the product name, version, owner and requirements:
 - the **About** tab in the app;
 - the **About** button in the Level Shift window;
 - **Netbuild → About** on the ribbon;
 - `LevelShift about` on the command line (`LevelShift --version` prints the version).
 
+The licence has its own page -- see **Licence** below.
+
 The exes also carry this in **Properties → Details**:
-- Company: SKAEC.COM;
+- Company: Netbuild;
 - Product: Level Shift by Netbuild;
 - the version;
-- Copyright: (c) 2026 SKAEC.COM.
+- Copyright: (c) 2026 Netbuild. All rights reserved.;
+- Comments: https://skaec.com.
 
 All of it comes from one file, `level_shift/about.py`.
 
@@ -248,7 +252,13 @@ All of it comes from one file, `level_shift/about.py`.
 | From source | Python 3.9 or later with tkinter |
 | The model | A project model opened editable (not read-only) · when workshared, the moved levels and their elements not borrowed by other users · Save / Synchronize after Apply |
 
-### License
+### Licence
 
-MIT License. Copyright (c) 2026 SKAEC.COM. The full text is in [`LICENSE`](../LICENSE), shipped
-next to the exes and in `Netbuild.extension`.
+Proprietary software -- (c) 2026 Netbuild. All rights reserved. https://skaec.com
+
+Level Shift is licensed under the **Netbuild Software Licence Agreement**; it needs no licence key.
+The full text is in [`LICENSE`](../LICENSE), shipped next to the exes and in `Netbuild.extension`.
+The licensing page (owner, website, licence-key status and the full agreement) is shown by:
+- the **Licence** tab in the app;
+- **Netbuild → Licence** on the ribbon, and the **Licence** button in every About window;
+- `LevelShift license` (or `LevelShift licence`) on the command line.

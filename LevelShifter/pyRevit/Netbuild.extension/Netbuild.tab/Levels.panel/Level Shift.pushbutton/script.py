@@ -3,11 +3,12 @@
 
 Runs directly inside Revit (no exe, no MCP listener).
 Check (plan only) -> Trial run (rolls back) -> Apply (one Undo entry: 'Level Shift by Netbuild').
-(c) 2026 SKAEC.COM -- MIT License. About: the About button in the window, or Netbuild > About.
+(c) 2026 Netbuild. All rights reserved. https://skaec.com
+About / Licence: the About button in the window, or Netbuild > About, Licence.
 """
 
 __title__ = "Level\nShift"
-__author__ = "Netbuild -- SKAEC.COM"
+__author__ = "Netbuild -- skaec.com"
 
 import datetime
 import io

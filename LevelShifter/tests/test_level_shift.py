@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
 from fake_revit import FakeRevit, mm  # noqa: E402
-from level_shift import cli, revit  # noqa: E402
+from level_shift import about, cli, revit  # noqa: E402
 from level_shift.payload import CODE  # noqa: E402
 from level_shift.core import MoveSpec, resolve  # noqa: E402
 from level_shift.runner import Runner  # noqa: E402
@@ -60,24 +60,40 @@ LEVELS = [{"id": 1, "name": "L00", "elev": 0.0}, {"id": 2, "name": "L01", "elev"
 
 class AboutTests(unittest.TestCase):
     def test_product_info_and_license(self):
-        from level_shift import __version__, about
+        from level_shift import __version__
         with open(os.path.join(os.path.dirname(os.path.dirname(HERE)), "LICENSE"), encoding="utf-8") as f:
             self.assertEqual(about.LICENSE_TEXT, f.read())            # the About screen shows the real LICENSE
-        self.assertIn("Copyright (c) 2026 SKAEC.COM", about.LICENSE_TEXT)
+        self.assertIn("Copyright (c) 2026 Netbuild. All rights reserved.", about.LICENSE_TEXT)
+        self.assertIn("The Software is proprietary. It is owned by Netbuild", about.LICENSE_TEXT)
+        self.assertEqual((about.OWNER, about.PUBLISHER, about.WEBSITE), ("Netbuild", "Netbuild", "https://skaec.com"))
+        self.assertEqual(about.COPYRIGHT, u"\u00a9 2026 Netbuild. All rights reserved.")
+        self.assertEqual(about.LICENSE_NAME, "Netbuild Software Licence Agreement (proprietary)")
         self.assertEqual(about.PRODUCT, "Level Shift by Netbuild")
         self.assertEqual(about.title("B003"), "Level Shift by Netbuild %s -- B003" % __version__)
         text = about.about_text()
-        for want in ("Level Shift by Netbuild  version " + __version__, u"\u00a9 2026 SKAEC.COM",
+        for want in ("Level Shift by Netbuild  version " + __version__, u"\u00a9 2026 Netbuild. All rights reserved.",
                      "Requirements", "Autodesk Revit 2019 - 2026", "pyRevit 4.8", "Python 3.9",
-                     "License: MIT License", "Permission is hereby granted"):
+                     "Licence: Netbuild Software Licence Agreement (proprietary) -- owned by Netbuild, "
+                     "https://skaec.com", "Netbuild Software Licence Agreement\n\nCopyright"):
             self.assertIn(want, text)
+        for gone in ("SKAEC.COM", "MIT"):
+            self.assertNotIn(gone, text)
+        page = about.licence_text()
+        for want in ("Proprietary software -- owned by Netbuild", "Website: https://skaec.com",
+                     "No licence key required", about.LICENSE_TEXT.rstrip()):
+            self.assertIn(want, page)
 
     def test_cli_about_and_version(self):
         buf = io.StringIO()
         with redirect_stdout(buf):
             self.assertEqual(cli.main(["about"]), 0)
-        self.assertIn("SKAEC.COM", buf.getvalue())
+        self.assertIn("Netbuild. All rights reserved.", buf.getvalue())
         self.assertIn("Requirements", buf.getvalue())
+        for cmd in ("license", "licence"):                                # the licensing page
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                self.assertEqual(cli.main([cmd]), 0)
+            self.assertEqual(buf.getvalue(), about.licence_text() + "\n")
         buf = io.StringIO()
         with redirect_stdout(buf), self.assertRaises(SystemExit):
             cli.main(["--version"])
@@ -95,9 +111,10 @@ class AboutTests(unittest.TestCase):
                                         "StringStruct", "VarFileInfo", "VarStruct"))
         eval(compile(text.split("\n", 1)[1], "version_info", "eval"), ns)  # what PyInstaller does with it
         fields = dict(a for a, k in seen["StringStruct"])
-        self.assertEqual(fields["CompanyName"], "SKAEC.COM")
+        self.assertEqual(fields["CompanyName"], "Netbuild")
         self.assertEqual(fields["ProductName"], "Level Shift by Netbuild")
-        self.assertEqual(fields["LegalCopyright"], "(c) 2026 SKAEC.COM -- MIT License")
+        self.assertEqual(fields["LegalCopyright"], "(c) 2026 Netbuild. All rights reserved.")
+        self.assertEqual(fields["Comments"], "https://skaec.com")
         self.assertEqual(fields["OriginalFilename"], "Level Shift by Netbuild.exe")
         self.assertEqual(seen["FixedFileInfo"][0][1]["filevers"][:2], (1, 3))
 
@@ -426,7 +443,15 @@ class GuiTests(Fixture):
                     time.sleep(0.02)
                 root.update()
             self.assertTrue(root.title().startswith("Level Shift by Netbuild 1."))
-            self.assertIn("Copyright (c) 2026 SKAEC.COM", app.license_box.get("1.0", "end"))
+            tabs = [app.nb.tab(t, "text").strip() for t in app.nb.tabs()]
+            self.assertEqual(tabs, ["Run", "Setup", "About", "Licence"])
+            app.nb.select(app.licence_tab)                                 # the licensing page
+            root.update()
+            self.assertEqual(app.license_box.get("1.0", "end-1c"), about.LICENSE_TEXT)
+            self.assertEqual(str(app.license_box.cget("state")), "disabled")
+            app._copy_licence()
+            self.assertEqual(root.clipboard_get(), about.LICENSE_TEXT)
+            app.nb.select(app.run_tab)
             app.do_levels()
             wait()
             self.assertEqual(len(app.levels), 6, app.checks.get("1.0", "end"))
