@@ -116,7 +116,7 @@ class AboutTests(unittest.TestCase):
         self.assertEqual(fields["LegalCopyright"], "(c) 2026 Netbuild. All rights reserved.")
         self.assertEqual(fields["Comments"], "https://skaec.com")
         self.assertEqual(fields["OriginalFilename"], "Level Shift by Netbuild.exe")
-        self.assertEqual(seen["FixedFileInfo"][0][1]["filevers"][:2], (1, 3))
+        self.assertEqual(seen["FixedFileInfo"][0][1]["filevers"][:2], (1, 4))
 
 
 class ResolveTests(unittest.TestCase):

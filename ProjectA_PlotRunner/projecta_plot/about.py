@@ -100,7 +100,7 @@ Contact: https://skaec.com
 
 
 def title(extra=""):
-    """Window title: 'Plot Runner by Netbuild 1.2.0' (+ ' -- extra')."""
+    """Window title: 'Plot Runner by Netbuild 1.3.0' (+ ' -- extra')."""
     return u"%s %s%s" % (PRODUCT, VERSION, (u" -- " + extra) if extra else u"")
 
 

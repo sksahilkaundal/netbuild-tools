@@ -212,7 +212,7 @@ class AboutTests(unittest.TestCase):
         self.assertTrue(text.isascii())
         self.assertEqual(fields["OriginalFilename"], "Plot Runner by Netbuild.exe")
         self.assertEqual(fields["InternalName"], "Plot Runner by Netbuild")
-        self.assertEqual(seen["FixedFileInfo"][0][1]["filevers"][:2], (1, 2))
+        self.assertEqual(seen["FixedFileInfo"][0][1]["filevers"][:2], (1, 3))
         self.assertIn("StringStruct(u'OriginalFilename', 'ProjectAPlot.exe')", make_version_file.render("ProjectAPlot.exe"))
 
 
