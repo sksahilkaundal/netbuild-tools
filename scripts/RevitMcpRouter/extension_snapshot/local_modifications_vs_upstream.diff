@@ -1,0 +1,224 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 6b95bf5..f0cc221 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -5,6 +5,7 @@ description = "MCP server for Revit"
+ readme = "README.md"
+ requires-python = ">=3.11"
+ dependencies = [
++    "httpx>=0.28.1",
+     "mcp[cli]>=1.9.0",
+ ]
+ 
+diff --git a/revit_mcp/code_execution.py b/revit_mcp/code_execution.py
+index faae198..53366c7 100644
+--- a/revit_mcp/code_execution.py
++++ b/revit_mcp/code_execution.py
+@@ -29,6 +29,9 @@ def register_code_execution_routes(api):
+             "use_transaction": true   # set false for UI ops like switching the active view
+         }
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             # Parse the request data
+             data = (
+diff --git a/revit_mcp/colors.py b/revit_mcp/colors.py
+index 4fc6719..a2bb8d5 100644
+--- a/revit_mcp/colors.py
++++ b/revit_mcp/colors.py
+@@ -1097,6 +1097,9 @@ def register_color_routes(api):
+             "custom_colors": ["#FF0000", "#00FF00", "#0000FF"]  // optional
+         }
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             data = (
+                 json.loads(request.data)
+@@ -1135,6 +1138,9 @@ def register_color_routes(api):
+             "category_name": "Walls"
+         }
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             data = (
+                 json.loads(request.data)
+@@ -1167,6 +1173,9 @@ def register_color_routes(api):
+             "category_name": "Walls"
+         }
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             data = (
+                 json.loads(request.data)
+diff --git a/revit_mcp/document.py b/revit_mcp/document.py
+index 50f1966..f6e1d19 100644
+--- a/revit_mcp/document.py
++++ b/revit_mcp/document.py
+@@ -28,6 +28,9 @@ def register_document_routes(api):
+             "audit": false
+         }
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             data = (
+                 json.loads(request.data)
+@@ -138,6 +141,9 @@ def register_document_routes(api):
+             "save": false
+         }
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             data = (
+                 json.loads(request.data)
+@@ -207,6 +213,9 @@ def register_document_routes(api):
+         If file_path is null/omitted, saves in place.
+         If file_path is provided, performs Save As to that location.
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             data = (
+                 json.loads(request.data)
+@@ -280,6 +289,9 @@ def register_document_routes(api):
+             "relinquish_all": true
+         }
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             data = (
+                 json.loads(request.data)
+diff --git a/revit_mcp/model_info.py b/revit_mcp/model_info.py
+index fc6d461..0c4241d 100644
+--- a/revit_mcp/model_info.py
++++ b/revit_mcp/model_info.py
+@@ -30,6 +30,9 @@ def register_model_info_routes(api):
+         - Room information with levels
+         - Link status
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             doc = revit.doc
+             if not doc:
+diff --git a/revit_mcp/placement.py b/revit_mcp/placement.py
+index fb6244b..962d968 100644
+--- a/revit_mcp/placement.py
++++ b/revit_mcp/placement.py
+@@ -34,6 +34,9 @@ def register_placement_routes(api):
+             }
+         }
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             if not doc:
+                 return routes.make_response(
+@@ -316,6 +319,9 @@ def register_placement_routes(api):
+         Returns:
+             list: [{ 'family_name': str, 'type_name': str, 'category': str, 'is_active': bool }]
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             if not doc:
+                 return routes.make_response(
+@@ -385,6 +391,9 @@ def register_placement_routes(api):
+         Returns:
+             dict: List of categories with family counts
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             if not doc:
+                 return routes.make_response(
+@@ -445,6 +454,9 @@ def register_placement_routes(api):
+         Returns:
+             dict: List of levels with their elevations
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             if not doc:
+                 return routes.make_response(
+diff --git a/revit_mcp/status.py b/revit_mcp/status.py
+index 7ed5215..33367d0 100644
+--- a/revit_mcp/status.py
++++ b/revit_mcp/status.py
+@@ -20,9 +20,12 @@ def register_status_routes(api):
+         Returns:
+             dict: Health status with Revit document information
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             from pyrevit import revit
+-            
++
+             doc = revit.doc
+             if doc:
+                 return routes.make_response(data={
+diff --git a/revit_mcp/views.py b/revit_mcp/views.py
+index 3ab08b3..be7b74d 100644
+--- a/revit_mcp/views.py
++++ b/revit_mcp/views.py
+@@ -37,6 +37,9 @@ def register_views_routes(api):
+         Returns:
+             dict: Contains base64 encoded image data and content type, or error message
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             if not doc:
+                 return routes.make_response(
+@@ -213,6 +216,9 @@ def register_views_routes(api):
+         Returns:
+             dict: List of view names organized by type
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             if not doc:
+                 return routes.make_response(
+@@ -302,6 +308,9 @@ def register_views_routes(api):
+         Returns:
+             dict: Detailed information about the current view
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             if not uidoc or not uidoc.Document:
+                 return routes.make_response(
+@@ -387,6 +396,9 @@ def register_views_routes(api):
+             "include_location": false
+         }
+         """
++        from revit_mcp.gate import is_enabled, paused_response
++        if not is_enabled():
++            return paused_response()
+         try:
+             if not doc or not uidoc:
+                 return routes.make_response(
