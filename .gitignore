@@ -4,3 +4,4 @@ __pycache__/
 # Live credentials / licence state: keep on the PCs only, never in git
 scripts/revitstatus_sheet_api.json
 scripts/license_cache.json
+.claude/worktrees/
