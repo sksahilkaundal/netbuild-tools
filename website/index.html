@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Netbuild</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Netbuild makes proprietary tools for Autodesk Revit and BIM coordination: Level Shift, Plot Runner, Revit MCP Router, Remote Router and Revit Status.">
+<meta property="og:title" content="Netbuild - Revit tools that check their own work">
+<meta property="og:description" content="Level Shift, Plot Runner, Revit MCP Router, Remote Router and Revit Status, by Netbuild.">
+<meta property="og:image" content="https://skaec.com/assets/og-image.png">
+<meta property="og:url" content="https://skaec.com">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="assets/netbuild-mark.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a drawing sheet. Content hangs off level datums; the product list is a schedule, details below it. */
+:root {
+  --surface: #f9f9f9; --paper: #ffffff; --ink: #212121; --muted: #5c5c66; --rule: #d4d4dc; --rule-soft: #e8e8ee;
+  --accent: #5f60ff; --accent-ink: #4344e0; --accent-soft: #ececff; --on-accent: #ffffff; --ok: #00a85d;
+  --slab: #e4e4ea; --night: #14141c;
+  --display: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --body: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, "SFMono-Regular", Menlo, monospace;
+  --measure: 64ch; --wrap: 1160px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --surface: #121218; --paper: #1c1c24; --ink: #e6e6ea; --muted: #a2a2ae; --rule: #3a3a46; --rule-soft: #2a2a34;
+  --accent: #7a7bff; --accent-ink: #a9a9ff; --accent-soft: #24244a; --on-accent: #ffffff; --ok: #2bc275;
+  --slab: #2c2c38; --night: #0c0c12; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --surface: #121218; --paper: #1c1c24; --ink: #e6e6ea; --muted: #a2a2ae; --rule: #3a3a46; --rule-soft: #2a2a34;
+  --accent: #7a7bff; --accent-ink: #a9a9ff; --accent-soft: #24244a; --on-accent: #ffffff; --ok: #2bc275;
+  --slab: #2c2c38; --night: #0c0c12; color-scheme: dark }
+
+* { box-sizing: border-box }
+html { scroll-behavior: smooth }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }
+body { margin: 0; background: var(--surface); color: var(--ink); font: 400 17px/1.6 var(--body); -webkit-font-smoothing: antialiased }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper) }
+a { color: var(--accent-ink) }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px }
+.wrap { max-width: var(--wrap); margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+@media (min-width: 720px) { .wrap { padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)) } }
+h1, h2, h3 { font-family: var(--display); font-stretch: 118%; text-wrap: balance; margin: 0; letter-spacing: -0.01em }
+p { margin: 0 }
+.label { font: 500 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.mono { font-family: var(--mono) }
+
+/* header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--rule-soft) }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px }
+.brand { display: inline-flex; align-items: center; color: var(--ink); text-decoration: none }
+.brand svg { height: 34px; width: auto; display: block }
+.nav { display: flex; gap: 22px; align-items: center; flex-wrap: wrap }
+.nav a { color: var(--ink); text-decoration: none; font-size: 15px; font-weight: 500 }
+.nav a:hover { color: var(--accent-ink) }
+.nav .cta { background: var(--accent); color: var(--on-accent); padding: 8px 14px; border-radius: 6px }
+.nav .cta:hover { color: var(--on-accent); background: var(--accent-ink) }
+@media (max-width: 760px) { .nav a:not(.cta) { display: none } }
+
+/* hero */
+.hero { background: var(--paper); border-bottom: 1px solid var(--rule-soft) }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 48px; align-items: center; padding-block: 72px 64px }
+@media (max-width: 900px) { .hero .wrap { grid-template-columns: 1fr; padding-block: 48px } }
+.hero h1 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; font-weight: 750; margin-top: 18px }
+.hero h1 em { font-style: normal; color: var(--accent-ink) }
+.lede { margin-top: 22px; font-size: 19px; color: var(--muted); max-width: 52ch }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 32px }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 6px; font-weight: 600; font-size: 16px; text-decoration: none; border: 1px solid var(--rule) ; color: var(--ink); background: var(--paper) }
+.btn:hover { border-color: var(--ink) }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent) }
+.btn.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink) }
+.figure { min-width: 0 }
+.figure svg { width: 100%; height: auto; display: block }
+.figcap { margin-top: 10px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap }
+
+/* section drawing */
+.grid-line { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 14 4 2 4 }
+.bubble { fill: var(--paper); stroke: var(--muted); stroke-width: 1.2 }
+.bubble-t { fill: var(--muted); font: 500 12px var(--mono); text-anchor: middle; dominant-baseline: central }
+.lvl { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 18 4 }
+.lvl-t { fill: var(--muted); font: 500 11.5px var(--mono) }
+.lvl-head { fill: var(--muted) }
+.lvl-head-ring { fill: var(--paper); stroke: var(--muted); stroke-width: 1.2 }
+.slab { fill: var(--slab); stroke: var(--ink); stroke-width: 1.2 }
+.col { fill: var(--slab); stroke: var(--ink); stroke-width: 1.2 }
+.moved .lvl { stroke: var(--accent); stroke-width: 2; stroke-dasharray: none }
+.moved .lvl-t { fill: var(--accent-ink); font-weight: 500 }
+.moved .lvl-head { fill: var(--accent) }
+.moved .lvl-head-ring { stroke: var(--accent) }
+.ghost { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 4; opacity: .7 }
+.dim { stroke: var(--accent); stroke-width: 1.2 }
+.dim-t { fill: var(--accent-ink); font: 500 11.5px var(--mono) }
+.keep { fill: var(--ok); font: 500 11.5px var(--mono) }
+.halo { paint-order: stroke; stroke: var(--paper); stroke-width: 5px; stroke-linejoin: round }
+.keep-dot { fill: var(--ok) }
+.moved { animation: lift 1.4s cubic-bezier(.3,.7,.2,1) .5s both }
+@keyframes lift { from { transform: translateY(24px) } to { transform: none } }
+.dimgrp { animation: fade .6s ease 1.8s both }
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .moved, .dimgrp { animation: none } }
+
+/* sections */
+section { padding-block: 88px }
+@media (max-width: 720px) { section { padding-block: 56px } }
+.sec-head { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; margin-bottom: 40px; align-items: baseline }
+@media (max-width: 820px) { .sec-head { grid-template-columns: 1fr; gap: 10px } }
+.sec-head h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.1; font-weight: 700 }
+.sec-head p { margin-top: 14px; color: var(--muted); max-width: var(--measure) }
+.datum { display: flex; align-items: center; gap: 10px; align-self: start }
+.datum::before { content: ""; width: 9px; height: 9px; background: var(--accent); transform: rotate(45deg); flex: none }
+
+/* schedule */
+.schedule-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper) }
+table.schedule { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 15px }
+.schedule caption { caption-side: top; text-align: left; padding: 12px 16px; font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--rule) }
+.schedule th, .schedule td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--rule-soft); vertical-align: top }
+.schedule thead th { font: 500 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--surface); border-bottom: 1px solid var(--rule) }
+.schedule tbody tr:last-child td, .schedule tbody tr:last-child th { border-bottom: 0 }
+.schedule tbody tr:hover { background: var(--accent-soft) }
+.schedule td.num, .schedule .mark { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap }
+.schedule a { color: var(--ink); font-weight: 600; text-decoration: none }
+.schedule a:hover { color: var(--accent-ink); text-decoration: underline }
+.key { display: inline-block; font: 500 12px var(--mono); padding: 2px 8px; border-radius: 999px; white-space: nowrap; border: 1px solid var(--rule); color: var(--muted) }
+.key.req { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft) }
+
+/* product details */
+.products { margin-top: 56px; display: grid; gap: 0; border-top: 1px solid var(--rule) }
+.product { display: grid; grid-template-columns: 220px minmax(0, 1fr) minmax(0, 0.9fr); gap: 32px; padding-block: 40px; border-bottom: 1px solid var(--rule); scroll-margin-top: 90px }
+@media (max-width: 1000px) { .product { grid-template-columns: 1fr minmax(0, 1fr) } .product .meta { grid-column: 1 / -1 } }
+@media (max-width: 680px) { .product { grid-template-columns: 1fr; gap: 20px } }
+.product .meta { display: flex; flex-direction: column; gap: 8px }
+.product .mark { font: 500 13px var(--mono); color: var(--accent-ink) }
+.product h3 { font-size: 24px; line-height: 1.15; font-weight: 700 }
+.product h3 span { display: block; font-size: 15px; font-weight: 500; font-stretch: 100%; color: var(--muted); margin-top: 4px; letter-spacing: 0 }
+.product .ver { font: 500 13px var(--mono); color: var(--muted) }
+.product .what { font-size: 18px; line-height: 1.55; max-width: var(--measure) }
+.product .body { min-width: 0; display: flex; flex-direction: column; gap: 18px }
+.product ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px }
+.product li { padding-left: 18px; position: relative; font-size: 15.5px; line-height: 1.5 }
+.product li::before { content: ""; position: absolute; left: 0; top: .62em; width: 7px; height: 1.5px; background: var(--accent) }
+.req-box { min-width: 0; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 20px }
+.req-box h4 { margin: 0 0 10px; font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.req-box ul + h4 { margin-top: 18px }
+.req-box li { font-size: 14.5px }
+
+/* method */
+.method { background: var(--paper); border-block: 1px solid var(--rule-soft) }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px solid var(--rule); border-radius: 4px; overflow: hidden }
+@media (max-width: 820px) { .steps { grid-template-columns: 1fr } }
+.step { padding: 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0 }
+.step + .step { border-left: 1px solid var(--rule) }
+@media (max-width: 820px) { .step + .step { border-left: 0; border-top: 1px solid var(--rule) } }
+.step .n { font: 500 13px var(--mono); color: var(--accent-ink) }
+.step h3 { font-size: 22px; font-weight: 700 }
+.step p { color: var(--muted); font-size: 16px }
+.principles { margin-top: 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px }
+@media (max-width: 820px) { .principles { grid-template-columns: 1fr; gap: 24px } }
+.principles h3 { font-size: 18px; font-weight: 650; font-stretch: 105%; margin-bottom: 8px }
+.principles p { color: var(--muted); font-size: 16px }
+
+/* founder */
+.founder .wrap { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px }
+@media (max-width: 820px) { .founder .wrap { grid-template-columns: 1fr; gap: 16px } }
+.founder blockquote { margin: 0; font-family: var(--display); font-stretch: 110%; font-size: clamp(22px, 2.6vw, 30px); line-height: 1.3; font-weight: 600; max-width: 36ch; text-wrap: balance }
+.founder .bio { margin-top: 22px; color: var(--muted); max-width: var(--measure) }
+.founder .facts { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 8px }
+.chip { font: 500 12.5px var(--mono); padding: 5px 10px; border: 1px solid var(--rule); border-radius: 999px; color: var(--ink); background: var(--paper) }
+
+/* licensing */
+.licence-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px }
+@media (max-width: 820px) { .licence-grid { grid-template-columns: 1fr } }
+.licence-grid > div { border-top: 2px solid var(--ink); padding-top: 16px }
+.licence-grid h3 { font-size: 18px; font-weight: 650; font-stretch: 105%; margin-bottom: 8px }
+.licence-grid p { color: var(--muted); font-size: 16px }
+details.agreement { margin-top: 40px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper) }
+details.agreement summary { cursor: pointer; padding: 16px 20px; font-weight: 600; display: flex; justify-content: space-between; gap: 12px; align-items: center; list-style: none }
+details.agreement summary::-webkit-details-marker { display: none }
+details.agreement summary::after { content: "+"; font: 500 20px var(--mono); color: var(--accent-ink) }
+details.agreement[open] summary::after { content: "\2212" }
+.agreement pre { margin: 0; padding: 20px; border-top: 1px solid var(--rule); font: 400 13.5px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink) }
+.agreement .row { display: flex; gap: 12px; flex-wrap: wrap; padding: 0 20px 20px }
+.agreement button { font: 600 14px var(--body); padding: 9px 14px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer }
+.agreement button:hover { border-color: var(--ink) }
+
+/* contact */
+.contact { background: var(--night); color: #f2f2f6 }
+.contact .wrap { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 48px; align-items: end }
+@media (max-width: 820px) { .contact .wrap { grid-template-columns: 1fr; gap: 28px } }
+.contact h2 { font-size: clamp(30px, 4vw, 48px); line-height: 1.05; font-weight: 750 }
+.contact p { margin-top: 16px; color: #b8b8c6; max-width: 52ch }
+.contact .label { color: #9a9aac }
+.contact-card { border: 1px solid #34344a; border-radius: 4px; padding: 24px; display: grid; gap: 16px }
+.contact-card .addr { font: 500 clamp(17px, 2vw, 21px) var(--mono); color: #ffffff; overflow-wrap: anywhere; user-select: all }
+.contact-card .row { display: flex; gap: 10px; flex-wrap: wrap }
+.contact .btn { background: transparent; color: #ffffff; border-color: #4a4a62 }
+.contact .btn:hover { border-color: #ffffff }
+.contact .btn.primary { background: #5f60ff; border-color: #5f60ff }
+.contact .btn.primary:hover { background: #7a7bff; border-color: #7a7bff }
+.contact button.btn { font-family: var(--body); cursor: pointer }
+
+footer { background: var(--night); color: #9a9aac; border-top: 1px solid #26263a; font-size: 13.5px }
+footer .wrap { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; padding-block: 28px calc(28px + env(safe-area-inset-bottom, 0px)) }
+footer a { color: #c8c8ff }
+footer p { max-width: 70ch }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Netbuild home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 498 120" aria-hidden="true" focusable="false"><g transform="translate(0 0) scale(1)"><rect width="120" height="120" rx="26" fill="#5f60ff"/><g fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round"><path d="M37 33V87M83 33V87M37 33L83 87"/></g><g fill="#ffffff"><circle cx="37" cy="33" r="9.5"/><circle cx="83" cy="33" r="9.5"/><circle cx="37" cy="87" r="9.5"/><circle cx="83" cy="87" r="9.5"/></g><g fill="#5f60ff"><circle cx="37" cy="33" r="3.6"/><circle cx="83" cy="33" r="3.6"/><circle cx="37" cy="87" r="3.6"/><circle cx="83" cy="87" r="3.6"/></g></g><path fill="currentColor" transform="translate(148 84) scale(0.0699708)" d="M92 0V-687H251L619 -342Q630 -333 646.5 -316.0Q663 -299 681.0 -280.5Q699 -262 712 -248H721Q720 -268 718.5 -298.0Q717 -328 717 -348V-687H882V0H726L361 -345Q335 -369 307.0 -398.0Q279 -427 262 -445H254Q255 -432 256.0 -401.0Q257 -370 257 -331V0Z M1351 12Q1246 12 1170.0 -17.5Q1094 -47 1052.5 -108.0Q1011 -169 1011 -263Q1011 -355 1051.5 -416.5Q1092 -478 1167.5 -508.5Q1243 -539 1345 -539Q1452 -539 1526.0 -509.0Q1600 -479 1638.0 -420.0Q1676 -361 1676 -274V-228H1175Q1178 -182 1200.0 -153.5Q1222 -125 1261.5 -112.0Q1301 -99 1354 -99Q1378 -99 1404.5 -104.5Q1431 -110 1454.5 -120.0Q1478 -130 1494.0 -145.5Q1510 -161 1512 -183H1672Q1672 -141 1650.0 -105.0Q1628 -69 1586.0 -43.0Q1544 -17 1484.5 -2.5Q1425 12 1351 12ZM1176 -323H1509Q1509 -349 1497.0 -368.5Q1485 -388 1462.5 -401.5Q1440 -415 1411.0 -421.5Q1382 -428 1348 -428Q1299 -428 1261.5 -415.5Q1224 -403 1202.5 -379.5Q1181 -356 1176 -323Z M2017 12Q1956 12 1916.5 -3.5Q1877 -19 1858.0 -56.5Q1839 -94 1839 -159V-413H1737V-527H1844L1875 -683H1995V-527H2140V-413H1995V-179Q1995 -141 2009.5 -121.5Q2024 -102 2072 -102H2140V-5Q2126 0 2103.5 4.0Q2081 8 2057.5 10.0Q2034 12 2017 12Z M2597 12Q2534 12 2480.5 -9.5Q2427 -31 2389 -83H2381L2368 0H2242V-724H2398V-462H2406Q2428 -488 2459.0 -505.0Q2490 -522 2527.5 -530.5Q2565 -539 2604 -539Q2682 -539 2741.5 -509.0Q2801 -479 2835.0 -418.0Q2869 -357 2869 -263Q2869 -171 2834.5 -109.5Q2800 -48 2739.0 -18.0Q2678 12 2597 12ZM2554 -113Q2604 -113 2639.0 -130.0Q2674 -147 2692.0 -179.0Q2710 -211 2710 -256V-271Q2710 -316 2692.0 -348.0Q2674 -380 2639.5 -397.5Q2605 -415 2556 -415Q2518 -415 2488.5 -404.5Q2459 -394 2438.5 -375.0Q2418 -356 2407.5 -329.0Q2397 -302 2397 -267V-259Q2397 -214 2415.5 -181.0Q2434 -148 2469.5 -130.5Q2505 -113 2554 -113Z M3197 12Q3086 12 3028.5 -41.5Q2971 -95 2971 -204V-527H3128V-229Q3128 -198 3136.5 -175.5Q3145 -153 3161.5 -139.0Q3178 -125 3201.5 -119.0Q3225 -113 3254 -113Q3296 -113 3332.0 -130.0Q3368 -147 3390.0 -178.0Q3412 -209 3412 -249V-527H3569V0H3443L3432 -89H3423Q3395 -51 3357.5 -29.0Q3320 -7 3279.0 2.5Q3238 12 3197 12Z M3697 -608V-724H3853V-608ZM3697 0V-527H3853V0Z M3981 0V-724H4137V0Z M4516 12Q4434 12 4373.0 -18.0Q4312 -48 4277.5 -109.5Q4243 -171 4243 -263Q4243 -357 4277.0 -418.0Q4311 -479 4371.0 -509.0Q4431 -539 4509 -539Q4548 -539 4585.0 -530.5Q4622 -522 4653.5 -505.0Q4685 -488 4707 -462H4714V-724H4871V0H4744L4731 -83H4723Q4685 -31 4631.5 -9.5Q4578 12 4516 12ZM4558 -113Q4608 -113 4643.0 -130.5Q4678 -148 4696.5 -181.0Q4715 -214 4715 -259V-267Q4715 -302 4704.5 -329.0Q4694 -356 4673.5 -375.0Q4653 -394 4623.5 -404.5Q4594 -415 4557 -415Q4508 -415 4473.5 -397.5Q4439 -380 4421.0 -348.0Q4403 -316 4403 -271V-256Q4403 -211 4421.5 -179.0Q4440 -147 4474.5 -130.0Q4509 -113 4558 -113Z"/></svg></a>
+    <nav class="nav" aria-label="Main">
+      <a href="#tools">Tools</a>
+      <a href="#method">How they work</a>
+      <a href="#licensing">Licensing</a>
+      <a href="#about">About</a>
+      <a class="cta" href="#contact">Get a licence</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="hero">
+    <div class="wrap">
+      <div>
+        <p class="label datum">Tools for Autodesk Revit &amp; BIM coordination</p>
+        <h1>Revit tools that <em>check their own work.</em></h1>
+        <p class="lede">Netbuild makes software for the jobs that eat a coordination week: moving levels without moving the model, running sheet export passes that are verified on disk, and letting Claude work across several open Revit sessions without guessing which model it is in.</p>
+        <div class="actions">
+          <a class="btn primary" href="#tools">See the five tools</a>
+          <a class="btn" href="#contact">Ask for a licence or trial</a>
+        </div>
+      </div>
+      <figure class="figure" style="margin:0">
+        <svg viewBox="0 0 640 430" role="img" aria-labelledby="sec-title sec-desc">
+          <title id="sec-title">Building section: Level Shift moving Level 03</title>
+          <desc id="sec-desc">A five-level building section on grids A, B and C. The Level 03 datum moves up 300 millimetres while the floor slab and columns stay where they are.</desc>
+          <!-- grids -->
+          <g>
+            <line class="grid-line" x1="130" y1="44" x2="130" y2="410"/>
+            <line class="grid-line" x1="310" y1="44" x2="310" y2="410"/>
+            <line class="grid-line" x1="490" y1="44" x2="490" y2="410"/>
+            <circle class="bubble" cx="130" cy="26" r="14"/><text class="bubble-t" x="130" y="26">A</text>
+            <circle class="bubble" cx="310" cy="26" r="14"/><text class="bubble-t" x="310" y="26">B</text>
+            <circle class="bubble" cx="490" cy="26" r="14"/><text class="bubble-t" x="490" y="26">C</text>
+          </g>
+          <!-- structure -->
+          <g>
+            <rect class="col" x="124" y="90" width="12" height="54"/><rect class="col" x="304" y="90" width="12" height="54"/><rect class="col" x="484" y="90" width="12" height="54"/>
+            <rect class="col" x="124" y="160" width="12" height="54"/><rect class="col" x="304" y="160" width="12" height="54"/><rect class="col" x="484" y="160" width="12" height="54"/>
+            <rect class="col" x="124" y="230" width="12" height="54"/><rect class="col" x="304" y="230" width="12" height="54"/><rect class="col" x="484" y="230" width="12" height="54"/>
+            <rect class="col" x="124" y="300" width="12" height="54"/><rect class="col" x="304" y="300" width="12" height="54"/><rect class="col" x="484" y="300" width="12" height="54"/>
+            <rect class="slab" x="96" y="80" width="428" height="10"/>
+            <rect class="slab" x="96" y="150" width="428" height="10"/>
+            <rect class="slab" x="96" y="220" width="428" height="10"/>
+            <rect class="slab" x="96" y="290" width="428" height="10"/>
+            <rect class="slab" x="96" y="360" width="428" height="10"/>
+          </g>
+          <!-- levels -->
+          <g id="levels">
+            <g><line class="lvl" x1="40" y1="80" x2="548" y2="80"/><circle class="lvl-head-ring" cx="556" cy="80" r="7"/><path class="lvl-head" d="M556 73a7 7 0 0 1 7 7h-7zM556 87a7 7 0 0 1-7-7h7z"/><text class="lvl-t" x="570" y="76">L05</text><text class="lvl-t" x="570" y="91">+14.000</text></g>
+            <g><line class="lvl" x1="40" y1="150" x2="548" y2="150"/><circle class="lvl-head-ring" cx="556" cy="150" r="7"/><path class="lvl-head" d="M556 143a7 7 0 0 1 7 7h-7zM556 157a7 7 0 0 1-7-7h7z"/><text class="lvl-t" x="570" y="146">L04</text><text class="lvl-t" x="570" y="161">+10.500</text></g>
+            <line class="ghost" x1="40" y1="220" x2="548" y2="220"/>
+            <g class="moved"><line class="lvl" x1="40" y1="196" x2="548" y2="196"/><circle class="lvl-head-ring" cx="556" cy="196" r="7"/><path class="lvl-head" d="M556 189a7 7 0 0 1 7 7h-7zM556 203a7 7 0 0 1-7-7h7z"/><text class="lvl-t" x="570" y="192">L03</text><text class="lvl-t" x="570" y="207">+7.300</text></g>
+            <g><line class="lvl" x1="40" y1="290" x2="548" y2="290"/><circle class="lvl-head-ring" cx="556" cy="290" r="7"/><path class="lvl-head" d="M556 283a7 7 0 0 1 7 7h-7zM556 297a7 7 0 0 1-7-7h7z"/><text class="lvl-t" x="570" y="286">L02</text><text class="lvl-t" x="570" y="301">+3.500</text></g>
+            <g><line class="lvl" x1="40" y1="360" x2="548" y2="360"/><circle class="lvl-head-ring" cx="556" cy="360" r="7"/><path class="lvl-head" d="M556 353a7 7 0 0 1 7 7h-7zM556 367a7 7 0 0 1-7-7h7z"/><text class="lvl-t" x="570" y="356">L01</text><text class="lvl-t" x="570" y="371">&#177;0.000</text></g>
+          </g>
+          <!-- annotation -->
+          <g class="dimgrp">
+            <line class="dim" x1="60" y1="196" x2="60" y2="220"/>
+            <line class="dim" x1="54" y1="202" x2="66" y2="190"/><line class="dim" x1="54" y1="226" x2="66" y2="214"/>
+            <text class="dim-t" x="14" y="212">+300</text>
+            <circle class="keep-dot" cx="214" cy="243" r="3.5"/>
+            <text class="keep halo" x="224" y="247">slab, columns: X, Y, Z unchanged</text>
+            <text class="dim-t halo" x="224" y="265">offset from L03: 0 &#8594; &#8722;300</text>
+          </g>
+          <text class="lvl-t" x="40" y="420">SECTION A&#8211;C &#183; 1:200</text>
+        </svg>
+        <figcaption class="figcap"><span class="label">Level Shift by Netbuild</span><span class="label">The level moves. The model doesn't.</span></figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <section id="tools">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="label datum">Tools</p>
+        <div>
+          <h2>Five tools, one licence agreement</h2>
+          <p>Each one runs on Windows next to Autodesk Revit and ships with an About screen and a Licence page. Two need no key at all; the Revit MCP Router and Revit Status are licensed per computer.</p>
+        </div>
+      </div>
+
+      <div class="schedule-wrap">
+        <table class="schedule">
+          <caption>Product schedule</caption>
+          <thead>
+            <tr><th scope="col">Mark</th><th scope="col">Product</th><th scope="col">Runs as</th><th scope="col">Revit</th><th scope="col">Licence</th><th scope="col">Version</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mark">NB-01</td><th scope="row"><a href="#level-shift">Level Shift by Netbuild</a></th><td>pyRevit ribbon button, Windows app, command line</td><td class="num">2019&#8211;2026</td><td><span class="key">No key</span></td><td class="num">1.4.0</td></tr>
+            <tr><td class="mark">NB-02</td><th scope="row"><a href="#plot-runner">Plot Runner by Netbuild</a></th><td>Windows app, command line</td><td class="num">2022 +</td><td><span class="key">No key</span></td><td class="num">1.3.0</td></tr>
+            <tr><td class="mark">NB-03</td><th scope="row"><a href="#mcp-router">Revit MCP Router by Netbuild</a></th><td>MCP bridge + Setup app</td><td class="num">2023&#8211;2026</td><td><span class="key req">Per-PC key</span></td><td class="num">1.3.7</td></tr>
+            <tr><td class="mark">NB-04</td><th scope="row"><a href="#remote-router">Remote Router by Netbuild</a></th><td>Remote MCP server (Claude on the web)</td><td class="num">as Router</td><td><span class="key">Router's key</span></td><td class="num">0.5.0</td></tr>
+            <tr><td class="mark">NB-05</td><th scope="row"><a href="#revit-status">Revit Status by Netbuild</a></th><td>Window + system-tray app</td><td class="num">2023&#8211;2026</td><td><span class="key req">Per-PC key</span></td><td class="num">1.2.4</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="products">
+        <article class="product" id="level-shift">
+          <div class="meta"><span class="mark">NB-01</span><h3>Level Shift<span>by Netbuild</span></h3><span class="ver">v1.4.0 &#183; no key</span></div>
+          <div class="body">
+            <p class="what">Moves up to 10 levels up or down while every element, group and model element hosted to them keeps its X, Y, Z. Each offset from a moved level changes by the opposite amount, and every element is measured before and after.</p>
+            <ul>
+              <li>New elevation or a move (+up / &#8722;down) per level, current elevation shown read-only</li>
+              <li>Check (plan only), Trial run (rolled back), then Apply as one Undo entry</li>
+              <li>Walls, floors, ceilings, roofs, columns, framing, stairs, railings, rooms, MEP, families, doors</li>
+              <li>Model group members compensated in place; ungrouped, fixed and regrouped only when needed</li>
+              <li>Bounding box of every model element compared; anything that moved is listed by Id</li>
+            </ul>
+          </div>
+          <div class="req-box">
+            <h4>Ribbon button (inside Revit)</h4>
+            <ul><li>Windows 10 / 11, 64-bit</li><li>Autodesk Revit 2019&#8211;2026</li><li>pyRevit 4.8 or later, IronPython engine</li></ul>
+            <h4>App and command line</h4>
+            <ul><li>No Python needed for the .exe files</li><li>Revit open with pyRevit and the Revit MCP extension listener running</li></ul>
+            <h4>The model</h4>
+            <ul><li>A project model, opened editable; workshared levels not borrowed by others</li></ul>
+          </div>
+        </article>
+
+        <article class="product" id="plot-runner">
+          <div class="meta"><span class="mark">NB-02</span><h3>Plot Runner<span>by Netbuild</span></h3><span class="ver">v1.3.0 &#183; no key</span></div>
+          <div class="body">
+            <p class="what">Runs a GA sheet export pass model by model through your own export scripts, which it reads and never edits. Every PDF and DWG it reports is checked on disk.</p>
+            <ul>
+              <li>One model at a time: it checks the model is open in Revit and binds to it by title</li>
+              <li>Revision date in any spelling; each model's own date format is read live before exporting</li>
+              <li>PDF only, DWG only, or both: all PDFs first, then all DWGs, per category</li>
+              <li>Every sheet with that revision date, or only the sheets you list (single, list or series)</li>
+              <li>Each file verified: written this pass, not empty, a real %PDF or AutoCAD header; DWG byproducts swept</li>
+              <li>A stalled batch drops to one sheet per call; every step logged with its file list</li>
+            </ul>
+          </div>
+          <div class="req-box">
+            <h4>App and command line</h4>
+            <ul><li>Windows 10 / 11, 64-bit; no Python needed for the .exe files</li></ul>
+            <h4>Revit</h4>
+            <ul><li>Autodesk Revit 2022 or later (Revit's own PDF export)</li><li>pyRevit, IronPython engine, with the Revit MCP extension listener running</li></ul>
+          </div>
+        </article>
+
+        <article class="product" id="mcp-router">
+          <div class="meta"><span class="mark">NB-03</span><h3>Revit MCP Router<span>by Netbuild</span></h3><span class="ver">v1.3.7 &#183; per-PC licence</span></div>
+          <div class="body">
+            <p class="what">Lets Claude Code, or any MCP client, drive any of several open Revit sessions on one computer, chosen per chat session by document, Revit version or port. It follows a document across a Revit restart and refuses to guess when the choice is ambiguous, so a command never runs on the wrong model.</p>
+            <ul>
+              <li>Revit 2023, 2024, 2025 and 2026 open side by side, each on its own port from 48884 up</li>
+              <li>Several models in one Revit: list open documents, run a task per model by title, dry run or apply</li>
+              <li>Setup app connects Claude Code in one click (and Codex when it is installed)</li>
+              <li>Shipped as native-compiled binaries with a signed, per-machine activation</li>
+            </ul>
+          </div>
+          <div class="req-box">
+            <h4>This computer</h4>
+            <ul><li>Windows 10 / 11, 64-bit; no admin rights, no Python</li><li>Autodesk Revit 2023&#8211;2026 with pyRevit and the Revit MCP connector extension</li><li>Claude Code, or another stdio MCP client</li></ul>
+            <h4>Licence</h4>
+            <ul><li>One licence per computer (Machine ID)</li><li>Internet to activate and at bridge start; 7 days offline grace</li></ul>
+          </div>
+        </article>
+
+        <article class="product" id="remote-router">
+          <div class="meta"><span class="mark">NB-04</span><h3>Remote Router<span>by Netbuild</span></h3><span class="ver">v0.5.0 &#183; uses the Router's licence</span></div>
+          <div class="body">
+            <p class="what">The Router's tools and session routing, served as a remote MCP server so Claude on the web, desktop and mobile can drive Revit on your PC through a custom connector. Nothing is opened on your network.</p>
+            <ul>
+              <li>Binds 127.0.0.1 only; an outbound Cloudflare Tunnel is the one way in</li>
+              <li>OAuth 2.1 sign-in with your passphrase (PKCE, token refresh); 5 wrong attempts lock sign-in for 15 minutes</li>
+              <li>Quick tunnel, or a named tunnel on your own domain for a fixed URL</li>
+              <li>Up to 10 independent slots, each with its own connector URL and its own selected Revit</li>
+              <li>Privacy switches: no code over the connector, no logging, tools denied by name</li>
+            </ul>
+          </div>
+          <div class="req-box">
+            <h4>This computer</h4>
+            <ul><li>Windows, with Revit open on the same PC</li><li>Revit MCP Router by Netbuild installed and licensed here</li><li>Python 3.10 or later with mcp and httpx</li></ul>
+            <h4>Reaching it from Claude</h4>
+            <ul><li>cloudflared; a Cloudflare account and domain for a named tunnel</li><li>A Claude plan that supports custom connectors</li></ul>
+          </div>
+        </article>
+
+        <article class="product" id="revit-status">
+          <div class="meta"><span class="mark">NB-05</span><h3>Revit Status<span>by Netbuild</span></h3><span class="ver">v1.2.4 &#183; per-PC licence</span></div>
+          <div class="body">
+            <p class="what">A small window and system-tray icon that shows, live, every running Revit with the document it has open, and every Claude Code session on the machine with the Revit it is routed to.</p>
+            <ul>
+              <li>Per Revit: version, process, open document and how long it has been active</li>
+              <li>Per Claude Code session: whether it has a live bridge to Revit, which port and document, and its uptime</li>
+              <li>Tray colour gives the overall state: green connected, amber no document or bridge, red listener down</li>
+              <li>Click a session row to bring that session to the front in the Claude app</li>
+            </ul>
+          </div>
+          <div class="req-box">
+            <h4>This computer</h4>
+            <ul><li>Windows 10 / 11, 64-bit; no install, no admin rights, no Python</li><li>Autodesk Revit 2023&#8211;2026 with pyRevit and the Revit MCP connector</li><li>Claude Code desktop app for the sessions list</li><li>Optional: Revit MCP Router by Netbuild</li></ul>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="method" id="method">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="label datum">How they work</p>
+        <div>
+          <h2>Nothing is applied that hasn't been checked</h2>
+          <p>Model changes are made the way a coordinator would want to make them by hand: plan first, rehearse, then commit as one step you can undo.</p>
+        </div>
+      </div>
+      <div class="steps">
+        <div class="step"><span class="n">1 / Check</span><h3>Plan only</h3><p>Lists what would change and why, with element Ids. The model is not touched.</p></div>
+        <div class="step"><span class="n">2 / Trial run</span><h3>Rehearse and roll back</h3><p>Runs the change for real inside a transaction, measures the result, then rolls it back.</p></div>
+        <div class="step"><span class="n">3 / Apply</span><h3>Commit as one Undo</h3><p>Applies the change as a single named entry, so one Ctrl+Z in Revit reverses all of it.</p></div>
+      </div>
+      <div class="principles">
+        <div><h3>Measured, not assumed</h3><p>Level Shift compares every model element's bounding box before and after. Plot Runner opens each exported file and reads its header.</p></div>
+        <div><h3>Refuses to guess</h3><p>When two open models could match a request, the Router stops and asks. A command never lands on the wrong Revit.</p></div>
+        <div><h3>Your files stay yours</h3><p>Export scripts are read, never edited. The Remote Router serves from your own PC, behind your own passphrase.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="founder" id="about">
+    <div class="wrap">
+      <p class="label datum">About Netbuild</p>
+      <div>
+        <blockquote>Every tool here started as a task that kept coming back on live projects.</blockquote>
+        <p class="bio">Netbuild is run by Sahil Kaundal, a project architect and BIM lead based in Dubai with over ten years of design development, construction documentation and BIM coordination across India, the UAE and the US. The tools are written for the people doing that work: model managers, BIM coordinators and project architects who need a large Revit model changed correctly, not quickly and wrongly.</p>
+        <div class="facts">
+          <span class="chip">Dubai, UAE</span><span class="chip">Revit &#183; pyRevit &#183; Dynamo</span><span class="chip">Navisworks &#183; ACC</span><span class="chip">Residential &#183; mixed-use &#183; hospitality &#183; healthcare</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="licensing" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="label datum">Licensing</p>
+        <div>
+          <h2>Proprietary software, owned by Netbuild</h2>
+          <p>All five products are covered by one agreement, the Netbuild Software Licence Agreement. It is shown in full on each product's Licence page and shipped next to every .exe.</p>
+        </div>
+      </div>
+      <div class="licence-grid">
+        <div><h3>Licensed, not sold</h3><p>You get a non-exclusive, non-transferable licence to install and use the software for your own work, on the terms you bought it under.</p></div>
+        <div><h3>Keys are per computer</h3><p>Where a key is needed it is tied to that computer's Machine ID. Moving to a new PC is a transfer from Netbuild.</p></div>
+        <div><h3>Check the results</h3><p>The software is provided as is. Keep backups of your models and review what each run reports.</p></div>
+      </div>
+      <details class="agreement" id="agreement">
+        <summary>Read the Netbuild Software Licence Agreement</summary>
+        <pre id="licence-text">Netbuild Software Licence Agreement
+
+Copyright (c) 2026 Netbuild. All rights reserved.
+Website: https://skaec.com
+
+This agreement covers every Netbuild software product -- including Level Shift by
+Netbuild, Plot Runner by Netbuild, Revit MCP Router by Netbuild, Remote Router by
+Netbuild and Revit Status by Netbuild -- together with its updates and documentation
+(the "Software").
+
+1. Ownership. The Software is proprietary. It is owned by Netbuild and protected by
+   copyright and other intellectual property laws. It is licensed, not sold.
+
+2. Licence. Netbuild grants you a non-exclusive, non-transferable licence to install
+   and use the Software for your own work, on the terms under which you obtained it
+   from Netbuild or https://skaec.com (including any licence key, number of computers
+   and licence period).
+
+3. Restrictions. You may not: (a) copy the Software, except to install it and to keep
+   one backup; (b) sell, rent, lease, lend, sublicense, publish or otherwise
+   distribute the Software or its licence keys; (c) modify, adapt, decompile,
+   disassemble or reverse engineer the Software, or bypass or disable its licence
+   checks, except where the law expressly allows it; (d) remove or alter any
+   copyright, trademark or licence notice.
+
+4. Licence keys. Where the Software requires a licence key, the key is valid only for
+   the computer(s) and period it was issued for. Moving a licence to another computer
+   requires a transfer from Netbuild. Netbuild may revoke a licence key if this
+   agreement is breached.
+
+5. Termination. This licence ends automatically if you breach this agreement. You
+   must then stop using the Software and delete all copies.
+
+6. No warranty. The Software is provided "as is", without warranty of any kind,
+   express or implied, including fitness for a particular purpose. You are
+   responsible for checking its results and for keeping backups of your models and
+   files.
+
+7. Limitation of liability. To the extent permitted by law, Netbuild is not liable
+   for any indirect, incidental or consequential damages, or for loss of data, of
+   work in Autodesk Revit models, of profit or of business, arising from the use of
+   or inability to use the Software.
+
+8. Third parties. Autodesk and Revit are registered trademarks of Autodesk, Inc.
+   pyRevit, the Model Context Protocol SDK and other third-party components are used
+   under their own licences. Netbuild is not affiliated with or endorsed by Autodesk
+   or Anthropic.
+
+Contact: https://skaec.com</pre>
+        <div class="row"><button type="button" id="copy-licence">Copy licence</button><a class="btn" href="LICENSE.txt">Download LICENSE.txt</a></div>
+      </details>
+    </div>
+  </section>
+
+  <section class="contact" id="contact">
+    <div class="wrap">
+      <div>
+        <p class="label datum">Contact</p>
+        <h2 style="margin-top:16px">Licences, trials and transfers</h2>
+        <p>Tell us which tool you need, how many computers it will run on and which Revit versions your team uses. For a keyed product, include the Machine ID shown on its Licence page.</p>
+      </div>
+      <div class="contact-card">
+        <span class="label">Email</span>
+        <span class="addr" id="email">info@skaec.com</span>
+        <div class="row">
+          <a class="btn primary" href="mailto:info@skaec.com?subject=Netbuild%20licence%20enquiry">Write an email</a>
+          <button class="btn" type="button" id="copy-email">Copy address</button>
+        </div>
+        <span class="label">Website &#183; skaec.com</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>&#169; 2026 Netbuild. All rights reserved. <a href="https://skaec.com">skaec.com</a></p>
+    <p>Autodesk and Revit are registered trademarks of Autodesk, Inc. Netbuild is not affiliated with or endorsed by Autodesk or Anthropic.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  function copy(btn, text, done) {
+    var label = btn.textContent;
+    function ok() { btn.textContent = done; setTimeout(function () { btn.textContent = label; }, 1800); }
+    function fallback(node) {
+      var r = document.createRange(); r.selectNodeContents(node);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      btn.textContent = "Selected - press Ctrl+C"; setTimeout(function () { btn.textContent = label; }, 2400);
+    }
+    return { ok: ok, fallback: fallback };
+  }
+  function wire(id, nodeId, done) {
+    var btn = document.getElementById(id), node = document.getElementById(nodeId);
+    if (!btn || !node) return;
+    btn.addEventListener("click", function () {
+      var c = copy(btn, node.textContent, done);
+      try {
+        navigator.clipboard.writeText(node.textContent).then(c.ok, function () { c.fallback(node); });
+      } catch (e) { c.fallback(node); }
+    });
+  }
+  wire("copy-licence", "licence-text", "Copied");
+  wire("copy-email", "email", "Copied");
+})();
+</script>
+</body>
+</html>

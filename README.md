@@ -12,6 +12,8 @@ sold with licence keys ship the same agreement as their `LICENSE.txt`.
 | **Remote Router by Netbuild** | `RevitMcpRemote/` (PR #2) | Proprietary, uses the Router's key | The Router's tools from Claude on the web, over an authenticated tunnel |
 | **Revit Status by Netbuild** | `scripts/` (PR #3) | Proprietary, licence key | Revit / Autodesk session status, tray app |
 
+Website: [`website/`](website/README.md) (skaec.com, static, built by `python website/build.py`). Logos and LinkedIn images: [`brand/`](brand/README.md).
+
 Every product is named "*Tool* by Netbuild" and has an About screen (product info, version,
 requirements) and a Licence page (owner, website, licence-key status, the full agreement) -- see
 [`CLAUDE.md`](CLAUDE.md) for the conventions.
