@@ -103,7 +103,7 @@ Contact: https://skaec.com
 
 
 def title(extra=""):
-    """Window title: 'Level Shift by Netbuild 1.3.0' (+ ' -- extra')."""
+    """Window title: 'Level Shift by Netbuild 1.4.0' (+ ' -- extra')."""
     return u"%s %s%s" % (PRODUCT, VERSION, (u" -- " + extra) if extra else u"")
 
 
