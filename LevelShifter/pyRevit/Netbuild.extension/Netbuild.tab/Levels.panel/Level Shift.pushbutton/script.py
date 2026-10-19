@@ -10,6 +10,9 @@ About / Licence: the About button in the window, or Netbuild > About, Licence.
 __title__ = "Level\nShift"
 __author__ = "Netbuild -- skaec.com"
 
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 import datetime
 import io
 import os

@@ -141,7 +141,7 @@ class Config(object):
 def install(doc, answers=None):
     """Put stub pyrevit / System modules in sys.modules. Returns a namespace the test inspects."""
     state = types.SimpleNamespace(alerts=[], started=[], config=Config(), saved=0, answers=answers or {},
-                                  picked=None, clipboard=[])
+                                  picked=None, clipboard=[], switch=[], reloaded=0)
 
     def alert(msg, title="", yes=False, no=False, exitscript=False, **kw):
         state.alerts.append((title, msg))
@@ -160,6 +160,10 @@ def install(doc, answers=None):
     forms.alert = alert
     forms.ask_for_string = lambda prompt="", title="", **kw: state.answers.get("ask")
     forms.pick_file = lambda **kw: state.picked
+    forms.pick_folder = lambda **kw: state.answers.get("folder")
+    forms.CommandSwitchWindow = types.SimpleNamespace(
+        show=lambda options, message="", **kw: state.switch.append((options, message)) or
+        state.answers.get("switch"))
     revit_mod = types.ModuleType("pyrevit.revit")
     revit_mod.doc = doc
     script = types.ModuleType("pyrevit.script")
@@ -168,6 +172,13 @@ def install(doc, answers=None):
     script.exit = exit_
     pyrevit = types.ModuleType("pyrevit")
     pyrevit.forms, pyrevit.revit, pyrevit.script = forms, revit_mod, script
+    userconfig = types.ModuleType("pyrevit.userconfig")
+    userconfig.user_config = types.SimpleNamespace(get_thirdparty_ext_root_dirs=lambda: [])
+    sessionmgr = types.ModuleType("pyrevit.loader.sessionmgr")
+    sessionmgr.reload_pyrevit = lambda: setattr(state, "reloaded", state.reloaded + 1)
+    loader = types.ModuleType("pyrevit.loader")
+    loader.sessionmgr = sessionmgr
+    pyrevit.userconfig, pyrevit.loader = userconfig, loader
 
     class ProcessStartInfo(object):
         def __init__(self, exe, args=""):
@@ -199,7 +210,8 @@ def install(doc, answers=None):
     windows.Clipboard = types.SimpleNamespace(SetText=lambda text: state.clipboard.append(text))
     system = types.ModuleType("System")
     sys.modules.update({"pyrevit": pyrevit, "pyrevit.forms": forms, "pyrevit.revit": revit_mod,
-                        "pyrevit.script": script, "System": system, "System.Windows": windows,
+                        "pyrevit.script": script, "pyrevit.userconfig": userconfig,
+                        "pyrevit.loader": loader, "pyrevit.loader.sessionmgr": sessionmgr, "System": system, "System.Windows": windows,
                         "System.Diagnostics": diag, "System.Windows.Controls": controls,
                         "System.Windows.Input": inp, "System.Windows.Media": media})
     WPFWindow.shown, WPFWindow.on_dialog = [], None
