@@ -141,7 +141,7 @@ class Config(object):
 def install(doc, answers=None):
     """Put stub pyrevit / System modules in sys.modules. Returns a namespace the test inspects."""
     state = types.SimpleNamespace(alerts=[], started=[], config=Config(), saved=0, answers=answers or {},
-                                  picked=None, clipboard=[], switch=[], reloaded=0)
+                                  picked=None, clipboard=[], switch=[], reloaded=0, printed=[])
 
     def alert(msg, title="", yes=False, no=False, exitscript=False, **kw):
         state.alerts.append((title, msg))
@@ -166,12 +166,15 @@ def install(doc, answers=None):
         state.answers.get("switch"))
     revit_mod = types.ModuleType("pyrevit.revit")
     revit_mod.doc = doc
+    revit_mod.uidoc = None
     script = types.ModuleType("pyrevit.script")
     script.get_config = lambda: state.config
     script.save_config = save_config
     script.exit = exit_
+    script.get_output = lambda: types.SimpleNamespace(print_md=state.printed.append)
     pyrevit = types.ModuleType("pyrevit")
     pyrevit.forms, pyrevit.revit, pyrevit.script = forms, revit_mod, script
+    pyrevit.DB = types.ModuleType("Autodesk.Revit.DB")
     userconfig = types.ModuleType("pyrevit.userconfig")
     userconfig.user_config = types.SimpleNamespace(get_thirdparty_ext_root_dirs=lambda: [])
     sessionmgr = types.ModuleType("pyrevit.loader.sessionmgr")

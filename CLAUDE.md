@@ -24,6 +24,11 @@ Owner and publisher: **Netbuild**. Website: **https://skaec.com**. Brand: **Netb
   discipline (e.g. `Levels.panel`), plus the **About** panel (`About.panel/About.pushbutton` and
   `Licence.pushbutton`), which
   stays last (`Netbuild.tab/bundle.yaml` `layout:`). Button `__author__ = "Netbuild -- skaec.com"`.
+  The same extension also holds the **Netbuild Tools 01** and **Netbuild Tools 02** tabs (Sahil's
+  utility buttons, formerly Studio-Claude "Netbuild 01 / 02").
+- A button that runs a saved script (Netbuild Tools wrappers) finds it **by file name** with
+  `netbuild_scripts.script_path(SCRIPT_NAME, OLD_PATH)` in any sub-folder of the script folders -- never a
+  hard-coded path only.
 - Every button script (`script.py`, and `config.py` when there is one) starts, right after `__author__`, with
   `import netbuild_scripts` / `netbuild_scripts.run_live(globals())`, so it runs from the script folder
   (**Netbuild -> Scripts -> Script Folder**, `lib/netbuild_scripts.py`) when one is set. Tests enforce this.

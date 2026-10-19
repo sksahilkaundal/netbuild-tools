@@ -1,0 +1,6 @@
+title: |-
+  Floor to Room
+  Finishes (Sel)
+tooltip: >
+  Rebuilds the SELECTED floor's sketch to one closed loop per room at wall finish faces. Select a floor before running.
+author: "Netbuild -- skaec.com"
