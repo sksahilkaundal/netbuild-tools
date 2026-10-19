@@ -81,7 +81,7 @@ class ScriptFolderTests(unittest.TestCase):
         new = write(os.path.join(self.share, "a", "b", "c", "hello.PUSHBUTTON", "script.py"), "")
         write(os.path.join(self.share, ".git", "Hello.pushbutton", "script.py"), "")
         write(os.path.join(self.share, "x", "Net.extension", "N.tab", "S.splitbutton", "Two.pushbutton", "script.py"), "")
-        found = ns.scan([self.share, os.path.join(self.tmp, "offline")])
+        found = ns.scan([self.share, os.path.join(self.share, "a"), os.path.join(self.tmp, "offline")])  # nested
         self.assertEqual(found["hello.pushbutton"], [os.path.dirname(new), os.path.dirname(old)])   # newest first
         self.assertIn("two.pushbutton", found)
         self.assertIn("net.extension", found)
@@ -135,6 +135,16 @@ class ScriptFolderTests(unittest.TestCase):
         self.assertEqual(ns.plan_update([os.path.dirname(self.ext)], exts, self.env), [])   # never from itself
 
 
+class ShippedDefaultTests(unittest.TestCase):
+    def test_default_folders(self):
+        s = ns.settings(EXT, {"USERPROFILE": r"C:\Users\user"})
+        self.assertEqual(s["from"], "extension default")
+        self.assertTrue(s["live"])
+        self.assertEqual([p.replace("\\", "/") for p in s["folders"]],
+                         ["C:/Users/user/OneDrive - Studio/Netbuild",
+                          "C:/Users/user/OneDrive - Studio/Netbuild/scripts"])
+
+
 class ScriptsPanelButtonTests(unittest.TestCase):
     """The Script Folder and Update Scripts buttons, run from a copy of the extension."""
 
@@ -146,6 +156,7 @@ class ScriptsPanelButtonTests(unittest.TestCase):
         os.environ.pop(ns.ENV, None)
         self.ext = os.path.join(self.tmp, "installed", "Netbuild.extension")
         shutil.copytree(EXT, self.ext, ignore=shutil.ignore_patterns("__pycache__"))
+        write(os.path.join(self.ext, ns.SETTINGS_NAME), '{"folders": [], "live": true}')   # no shipped default
         panel = os.path.join(self.ext, "Netbuild.tab", "Scripts.panel")
         self.folder_btn = os.path.join(panel, "Script Folder.pushbutton", "script.py")
         self.update_btn = os.path.join(panel, "Update Scripts.pushbutton", "script.py")

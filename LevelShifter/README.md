@@ -70,8 +70,9 @@ Which folder is used, first match wins:
 1. your own choice from **Script Folder** (`%APPDATA%\Netbuild\pyRevit\script_source.json`);
 2. the `NETBUILD_SCRIPT_SOURCE` environment variable (several folders separated by `;`) -- for an
    office-wide setting pushed by IT;
-3. the default shipped in `Netbuild.extension\script_source.json` (`"folders": []` -- none -- as shipped;
-   `%USERPROFILE%`-style variables are expanded).
+3. the default shipped in `Netbuild.extension\script_source.json`: both
+   `%USERPROFILE%\OneDrive - Studio\Netbuild` and its `scripts` sub-folder are scanned
+   (`%USERPROFILE%`-style variables are expanded; a folder inside another is searched once).
 
 To update the extension after changing the engine, run `python LevelShifter/sync_pyrevit_lib.py`.
 It copies the shared files into `Netbuild.extension\lib\level_shift`, and the tests fail while the

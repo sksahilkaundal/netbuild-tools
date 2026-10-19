@@ -128,14 +128,15 @@ def _newest(folder):
 
 def scan(folders):
     """{lower-case folder name: [paths, newest first]} for every button folder and .extension folder below folders."""
-    found = {}
+    found, seen = {}, set()
     for root in folders:
         if not os.path.isdir(root):
             continue
         for d, dirs, files in os.walk(root):
             dirs[:] = sorted(n for n in dirs if n not in SKIP_DIRS)
             name = os.path.basename(d).lower()
-            if name.endswith(BUNDLES) or name.endswith(".extension"):
+            if (name.endswith(BUNDLES) or name.endswith(".extension")) and _key(d) not in seen:
+                seen.add(_key(d))               # a folder inside another script folder is found once
                 found.setdefault(name, []).append(d)
             if name.endswith(BUNDLES):
                 dirs[:] = []                    # a button folder holds no buttons
