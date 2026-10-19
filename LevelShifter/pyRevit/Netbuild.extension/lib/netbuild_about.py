@@ -11,9 +11,10 @@ from System.Diagnostics import Process
 from System.Windows import Clipboard
 
 from level_shift import about as level_shift_about
+from netbuild_tools import about as netbuild_tools_about
 import levelshift_ui as ui
 
-PRODUCTS = [level_shift_about]
+PRODUCTS = [level_shift_about, netbuild_tools_about]
 
 
 class AboutWindow(forms.WPFWindow):

@@ -300,6 +300,65 @@ class ScriptPathTests(unittest.TestCase):
             fake.close()
 
 
+class NetbuildToolsAboutTests(unittest.TestCase):
+    """Netbuild Tools by Netbuild 1.0.0: its about module, the About / Licence screens and the command line."""
+
+    def setUp(self):
+        from netbuild_tools import about
+        self.about = about
+
+    def test_about_module(self):
+        a = self.about
+        with io.open(os.path.join(os.path.dirname(ROOT), "LICENSE"), encoding="utf-8") as f:
+            self.assertEqual(a.LICENSE_TEXT, f.read())                   # the repository's LICENSE, as is
+        self.assertEqual((a.PRODUCT, a.VERSION), ("Netbuild Tools by Netbuild", "1.0.0"))
+        self.assertEqual((a.OWNER, a.PUBLISHER, a.WEBSITE), ("Netbuild", "Netbuild", "https://skaec.com"))
+        self.assertEqual(a.COPYRIGHT, u"\u00a9 2026 Netbuild. All rights reserved.")
+        self.assertEqual(a.LICENSE_NAME, "Netbuild Software Licence Agreement (proprietary)")
+        self.assertEqual(a.LICENSE_KIND, "Proprietary software -- owned by Netbuild")
+        self.assertEqual(a.LICENCE_KEY, "No licence key required for this product.")
+        self.assertEqual(a.title("Script folder"), "Netbuild Tools by Netbuild 1.0.0 -- Script folder")
+        text = a.about_text()
+        for part in ("Netbuild Tools by Netbuild  version 1.0.0", "Requirements", "pyRevit 4.8 or later",
+                     "Revit 2023 or later", "Python 3.14 with openpyxl", a.LICENSE_TEXT.rstrip()):
+            self.assertIn(part, text)
+        self.assertTrue(a.licence_text().startswith("Netbuild Tools by Netbuild  version 1.0.0\n"
+                                                    "Proprietary software -- owned by Netbuild\n"))
+
+    def test_about_and_licence_buttons(self):
+        fake = FakeRevit()
+        try:
+            st = pyrevit_stubs.install(fake.doc, answers={"pick": "Netbuild Tools by Netbuild"})
+            runpy.run_path(os.path.join(EXT, "Netbuild.tab", "About.panel", "About.pushbutton", "script.py"),
+                           run_name="__main__")
+            self.assertEqual(st.picks[-1], ["Level Shift by Netbuild", "Netbuild Tools by Netbuild"])
+            win = pyrevit_stubs.WPFWindow.shown[-1]
+            self.assertEqual(win.Title, "About Netbuild Tools by Netbuild")
+            self.assertIn("Version 1.0.0", win.version_tb.Text)
+            win.licence_btn.click()
+            lic = pyrevit_stubs.WPFWindow.shown[-1]
+            self.assertEqual(lic.Title, "Licence -- Netbuild Tools by Netbuild")
+            self.assertEqual(lic.license_tb.Text, self.about.LICENSE_TEXT)
+            st = pyrevit_stubs.install(fake.doc, answers={"pick": None})          # picker cancelled
+            runpy.run_path(os.path.join(EXT, "Netbuild.tab", "About.panel", "Licence.pushbutton", "script.py"),
+                           run_name="__main__")
+            self.assertEqual(pyrevit_stubs.WPFWindow.shown, [])
+        finally:
+            fake.close()
+
+    def test_command_line(self):
+        sys.path.insert(0, os.path.join(ROOT, "pyRevit"))
+        import add_live_header
+        for args, first in ((["--version"], "Netbuild Tools by Netbuild 1.0.0"),
+                            (["about"], "Netbuild Tools by Netbuild  version 1.0.0"),
+                            (["licence"], "Netbuild Tools by Netbuild  version 1.0.0"),
+                            (["license"], "Netbuild Tools by Netbuild  version 1.0.0")):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                self.assertEqual(add_live_header.main(args), 0)
+            self.assertEqual(buf.getvalue().splitlines()[0], first, args)
+
+
 class ShippedDefaultTests(unittest.TestCase):
     def test_default_folders(self):
         s = ns.settings(EXT, {"USERPROFILE": r"C:\Users\user"})
@@ -357,6 +416,9 @@ class ScriptsPanelButtonTests(unittest.TestCase):
         self.assertFalse(ns.settings(self.ext)["live"])
         st = self.press(self.folder_btn, switch=None)                  # cancelled: nothing changes
         self.assertEqual(st.alerts, [])
+        st = self.press(self.folder_btn, switch="About Netbuild Tools")
+        self.assertEqual(pyrevit_stubs.WPFWindow.shown[-1].Title, "About Netbuild Tools by Netbuild")
+        self.assertEqual(st.alerts, [])
         other = os.path.join(self.tmp, "installed", "Netbuild 01.extension")
         btn = write(os.path.join(other, "N.tab", "P.panel", "B.pushbutton", "script.py"), "x = 1\n")
         st = self.press(self.folder_btn, switch="Add live scripts to other extensions...",
@@ -378,6 +440,7 @@ class ScriptsPanelButtonTests(unittest.TestCase):
         st = self.press(self.update_btn)                               # confirm (alert -> True), copy, reload
         self.assertIn("Copy 1 changed file from the script folder?", st.alerts[0][1])
         self.assertIn("1 file updated", st.alerts[-1][1])
+        self.assertEqual(st.alerts[-1][0], "Netbuild Tools by Netbuild 1.0.0 -- Update scripts")
         self.assertEqual(st.reloaded, 1)
         self.assertEqual(read(direct), read(shared))
         st = self.press(self.update_btn)

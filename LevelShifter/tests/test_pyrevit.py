@@ -44,7 +44,9 @@ IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DI
                                                                        FOLDER, UPDATE] +
                     [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py",
                                                             "netbuild_about.py", "netbuild_scripts.py",
-                                                            "netbuild_roundtrip.py")])
+                                                            "netbuild_roundtrip.py",
+                                                            os.path.join("netbuild_tools", "__init__.py"),
+                                                            os.path.join("netbuild_tools", "about.py"))])
 BUTTON_SCRIPTS = sorted(os.path.join(d, n) for d, _, files in os.walk(EXT) for n in files
                         if n in ("script.py", "config.py") and d.endswith(".pushbutton"))
 IRONPYTHON_FILES += [p for p in BUTTON_SCRIPTS if p not in IRONPYTHON_FILES]
@@ -282,8 +284,9 @@ class ButtonTests(unittest.TestCase):
         self.assertEqual(win.license_tb.Text, about.LICENSE_TEXT)
 
     def test_about_button(self):
-        st = pyrevit_stubs.install(self.doc)
+        st = pyrevit_stubs.install(self.doc, answers={"pick": "Level Shift by Netbuild"})
         runpy.run_path(ABOUT, run_name="__main__")
+        self.assertEqual(st.picks[-1], ["Level Shift by Netbuild", "Netbuild Tools by Netbuild"])
         win = pyrevit_stubs.WPFWindow.shown[-1]
         self.check_about(win)
         win.copy_btn.click()
@@ -298,7 +301,7 @@ class ButtonTests(unittest.TestCase):
 
     def test_licence_button(self):
         from level_shift import about
-        st = pyrevit_stubs.install(self.doc)
+        st = pyrevit_stubs.install(self.doc, answers={"pick": "Level Shift by Netbuild"})
         runpy.run_path(LICENCE, run_name="__main__")
         win = pyrevit_stubs.WPFWindow.shown[-1]
         self.check_licence(win)
