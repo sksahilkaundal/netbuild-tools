@@ -4,6 +4,7 @@ script from the folder, Update Scripts, and the two Scripts-panel buttons (stub 
     python -m unittest discover -s LevelShifter/tests -v
 """
 
+import contextlib
 import io
 import os
 import runpy
@@ -81,7 +82,7 @@ class ScriptFolderTests(unittest.TestCase):
         new = write(os.path.join(self.share, "a", "b", "c", "hello.PUSHBUTTON", "script.py"), "")
         write(os.path.join(self.share, ".git", "Hello.pushbutton", "script.py"), "")
         write(os.path.join(self.share, "x", "Net.extension", "N.tab", "S.splitbutton", "Two.pushbutton", "script.py"), "")
-        found = ns.scan([self.share, os.path.join(self.tmp, "offline")])
+        found = ns.scan([self.share, os.path.join(self.share, "a"), os.path.join(self.tmp, "offline")])  # nested
         self.assertEqual(found["hello.pushbutton"], [os.path.dirname(new), os.path.dirname(old)])   # newest first
         self.assertIn("two.pushbutton", found)
         self.assertIn("net.extension", found)
@@ -135,6 +136,180 @@ class ScriptFolderTests(unittest.TestCase):
         self.assertEqual(ns.plan_update([os.path.dirname(self.ext)], exts, self.env), [])   # never from itself
 
 
+class HeaderTests(unittest.TestCase):
+    """Adding the run_live lines to the buttons of other extensions (Netbuild 01 / 02)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.env = {"APPDATA": os.path.join(self.tmp, "appdata")}
+        self.lib = os.path.join(EXT, "lib", "netbuild_scripts.py")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_header_position(self):
+        cases = [
+            ('"""Doc\nmore"""\n__title__ = "A"\n__author__ = ("x",\n    "y")\nimport os\n', 5),
+            ("# -*- coding: utf-8 -*-\nfrom pyrevit import forms\n", 1),
+            ("#! python3\nfrom __future__ import print_function\n__doc__ = \'\'\'a\nb\'\'\'\n\nx = 1\n", 4),
+            ("import os\n", 0),
+            ("__context__ = 'zero-doc'  # comment ) (\n__title__ = 'a\\\'b'\nprint('x')\n", 2),
+        ]
+        for src, at in cases:
+            self.assertEqual(ns.header_position(src.splitlines(True)), at, src)
+        out = ns.with_header('"""Doc"""\r\n__author__ = "a"\r\nimport os\r\n')
+        self.assertEqual(out, '"""Doc"""\r\n__author__ = "a"\r\n\r\n' + ns.HEADER.replace("\n", "\r\n") +
+                         "\r\nimport os\r\n")
+        self.assertIsNone(ns.with_header(out))
+        compile(ns.with_header(cases[0][0]), "x", "exec")
+
+    def test_add_header_to_other_extensions(self):
+        ext = os.path.join(self.tmp, "exts", "Netbuild 01.extension")
+        tab = os.path.join(ext, "Netbuild 01.tab", "Walls.panel")
+        btn = write(os.path.join(tab, "Tags.pulldown", "Wall Tags.pushbutton", "script.py"),
+                    '# -*- coding: utf-8 -*-\n"""Tag walls."""\n__title__ = "Wall Tags"\nRAN.append("local")\n')
+        cfg = write(os.path.join(tab, "Tags.pulldown", "Wall Tags.pushbutton", "config.py"), "print('cfg')\n")
+        bom = write(os.path.join(tab, "Bom.pushbutton", "script.py"), "")
+        with io.open(bom, "wb") as f:                                   # UTF-8 with BOM, Windows line ends
+            f.write(b"\xef\xbb\xbf# -*- coding: utf-8 -*-\r\nx = 1\r\n")
+        smart = write(os.path.join(tab, "Toggle.smartbutton", "script.py"), "def __selfinit__(*a):\n    pass\n")
+        done = write(os.path.join(tab, "Done.pushbutton", "script.py"), ns.HEADER)
+        other = os.path.join(self.tmp, "exts", "Netbuild 02.extension")
+        write(os.path.join(other, "N2.tab", "P.panel", "B.pushbutton", "script.py"), "x = 2\n")
+
+        exts = ns.extensions_in(os.path.join(self.tmp, "exts"))
+        self.assertEqual([os.path.basename(e) for e in exts], ["Netbuild 01.extension", "Netbuild 02.extension"])
+        todo, skipped, backup = ns.add_header(exts, self.lib, env=self.env)       # report only
+        self.assertIsNone(backup)
+        self.assertEqual(read(cfg), "print('cfg')\n")
+        self.assertEqual(len(todo), 6)                  # 3 scripts + config in 01, 1 script in 02, lib in each
+        self.assertEqual(sorted(p for p, why in skipped), sorted([smart, done]))
+
+        changed, skipped, backup = ns.add_header(exts, self.lib, apply=True, env=self.env)
+        self.assertEqual(sorted(changed), sorted(todo))
+        self.assertIn(ns.HEADER, read(btn))
+        self.assertTrue(read(btn).startswith('# -*- coding: utf-8 -*-\n"""Tag walls."""\n__title__ = "Wall Tags"\n'))
+        with io.open(bom, "rb") as f:
+            self.assertTrue(f.read().startswith(b"\xef\xbb\xbf# -*- coding: utf-8 -*-\r\n\r\nimport netbuild_scripts\r\n"))
+        self.assertEqual(read(os.path.join(ext, "lib", "netbuild_scripts.py")), read(self.lib))
+        self.assertEqual(read(os.path.join(backup, "Netbuild 01.extension", "Netbuild 01.tab", "Walls.panel",
+                                           "Tags.pulldown", "Wall Tags.pushbutton", "config.py")), "print('cfg')\n")
+        self.assertEqual(ns.add_header(exts, self.lib, env=self.env)[0], [])        # nothing left to do
+
+        share = os.path.join(self.tmp, "share")                                    # the button now runs live
+        write(os.path.join(share, "x", "Wall Tags.pushbutton", "script.py"), ns.HEADER + "RAN.append('shared')\n")
+        os.environ["APPDATA"] = self.env["APPDATA"]
+        try:
+            ns.save_settings(folders=[share])
+            ran = []
+            with self.assertRaises(SystemExit):
+                runpy.run_path(btn, init_globals={"RAN": ran}, run_name="__main__")
+            self.assertEqual(ran, ["shared"])
+        finally:
+            os.environ.pop("APPDATA", None)
+
+    def test_command_line(self):
+        sys.path.insert(0, os.path.join(ROOT, "pyRevit"))
+        import add_live_header
+        ext = os.path.join(self.tmp, "Netbuild 02.extension")
+        btn = write(os.path.join(ext, "T.tab", "P.panel", "B.pushbutton", "script.py"), "x = 2\n")
+        os.environ["APPDATA"] = self.env["APPDATA"]
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.cli(add_live_header, ext, btn)
+        finally:
+            os.environ.pop("APPDATA", None)
+
+    def cli(self, add_live_header, ext, btn):
+        self.assertEqual(add_live_header.main([ext]), 0)
+        self.assertEqual(read(btn), "x = 2\n")
+        self.assertEqual(add_live_header.main([ext, "--apply"]), 0)
+        self.assertIn(ns.HEADER, read(btn))
+        self.assertEqual(add_live_header.main([os.path.join(self.tmp, "nothing-here")]), 1)
+
+
+class ScriptPathTests(unittest.TestCase):
+    """Netbuild Tools 01 / 02: the wrapper buttons find the script they run by file name in the script folders."""
+
+    TOOLS = [os.path.join(EXT, "Netbuild Tools 01.tab"), os.path.join(EXT, "Netbuild Tools 02.tab")]
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self._env = dict(os.environ)
+        os.environ["APPDATA"] = os.path.join(self.tmp, "appdata")
+        os.environ.pop(ns.ENV, None)
+        self.share = os.path.join(self.tmp, "OneDrive - Studio", "Netbuild")
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._env)
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def wrappers(self):
+        out = []
+        for tab in self.TOOLS:
+            for d, _, files in os.walk(tab):
+                if "script.py" in files and "SCRIPT_NAME = " in read(os.path.join(d, "script.py")):
+                    out.append(os.path.join(d, "script.py"))
+        return sorted(out)
+
+    def test_script_path(self):
+        ns.save_settings(folders=[self.share, os.path.join(self.share, "scripts")])     # nested, like the default
+        deep = write(os.path.join(self.share, "scripts", "2026", "JoinSameMaterial_MCP.py"), "x = 1\n")
+        self.assertEqual(ns.script_path("joinsamematerial_mcp.py"), deep)               # any depth, any case
+        late = write(os.path.join(self.share, "Late_MCP.py"), "")
+        self.assertEqual(ns.script_path("Late_MCP.py"), late)          # added after the last scan: scanned again
+        old = write(os.path.join(self.tmp, "SK", "Old_MCP.py"), "")
+        self.assertEqual(ns.script_path("Old_MCP.py", old), old)       # not in the folders: the old path
+        self.assertIsNone(ns.script_path("Gone_MCP.py", os.path.join(self.tmp, "nope.py")))
+        text = ns.missing_text("Gone_MCP.py", r"C:\SK\Gone_MCP.py")
+        self.assertIn("Gone_MCP.py was not found.", text)
+        self.assertIn(self.share, text)
+        self.assertIn(r"C:\SK\Gone_MCP.py", text)
+        write(os.path.join(self.share, "B.pushbutton", "Inside_MCP.py"), "")             # button files: not scripts
+        self.assertIsNone(ns.script_path("Inside_MCP.py"))
+
+    def test_every_wrapper_looks_its_script_up_by_name(self):
+        wrappers = self.wrappers()
+        self.assertEqual(len(wrappers), 15)
+        for p in wrappers:
+            src = read(p)
+            name = src.split('SCRIPT_NAME = "', 1)[1].split('"', 1)[0]
+            old = src.split('OLD_PATH = r"', 1)[1].split('"', 1)[0]
+            self.assertEqual(name, old.split("\\")[-1], p)
+            self.assertIn("SCRIPT_PATH = netbuild_scripts.script_path(SCRIPT_NAME, OLD_PATH)", src, p)
+            self.assertLess(src.index("SCRIPT_PATH = netbuild_scripts"), src.index("open(SCRIPT_PATH"), p)
+
+    def test_wrapper_runs_the_script_from_the_folder(self):
+        fake = FakeRevit()
+        try:
+            ns.save_settings(folders=[self.share])
+            btn = [p for p in self.wrappers() if "Floor Plate Area" in p][0]
+            st = pyrevit_stubs.install(fake.doc)
+            with self.assertRaises(pyrevit_stubs.ScriptExit):          # not there: says where it looked
+                runpy.run_path(btn, run_name="__main__")
+            self.assertIn("floor_plate_area.py was not found", st.alerts[-1][1])
+            self.assertIn(self.share, st.alerts[-1][1])
+            write(os.path.join(self.share, "Areas", "floor_plate_area.py"), "System.ran = (doc, __file__)\n")
+            st = pyrevit_stubs.install(fake.doc)
+            runpy.run_path(btn, run_name="__main__")
+            self.assertEqual(sys.modules["System"].ran,
+                             (fake.doc, os.path.join(self.share, "Areas", "floor_plate_area.py")))
+            self.assertIn("**Done.**", st.printed[-1])
+        finally:
+            fake.close()
+
+
+class ShippedDefaultTests(unittest.TestCase):
+    def test_default_folders(self):
+        s = ns.settings(EXT, {"USERPROFILE": r"C:\Users\user"})
+        self.assertEqual(s["from"], "extension default")
+        self.assertTrue(s["live"])
+        self.assertEqual([p.replace("\\", "/") for p in s["folders"]],
+                         ["C:/Users/user/OneDrive - Studio/Netbuild",
+                          "C:/Users/user/OneDrive - Studio/Netbuild/scripts"])
+
+
 class ScriptsPanelButtonTests(unittest.TestCase):
     """The Script Folder and Update Scripts buttons, run from a copy of the extension."""
 
@@ -146,6 +321,7 @@ class ScriptsPanelButtonTests(unittest.TestCase):
         os.environ.pop(ns.ENV, None)
         self.ext = os.path.join(self.tmp, "installed", "Netbuild.extension")
         shutil.copytree(EXT, self.ext, ignore=shutil.ignore_patterns("__pycache__"))
+        write(os.path.join(self.ext, ns.SETTINGS_NAME), '{"folders": [], "live": true}')   # no shipped default
         panel = os.path.join(self.ext, "Netbuild.tab", "Scripts.panel")
         self.folder_btn = os.path.join(panel, "Script Folder.pushbutton", "script.py")
         self.update_btn = os.path.join(panel, "Update Scripts.pushbutton", "script.py")
@@ -168,14 +344,26 @@ class ScriptsPanelButtonTests(unittest.TestCase):
     def test_script_folder_button(self):
         write(os.path.join(self.share, "Revit", "Levels", "Level Shift.pushbutton", "script.py"), "")
         st = self.press(self.folder_btn, switch="Choose the folder...", folder=self.share)
-        self.assertIn("No script folder set", st.switch[0][1])
+        self.assertEqual(st.switch[0][1], "No script folder -- buttons run their bundled scripts")
         self.assertEqual(ns.settings(self.ext)["folders"], [self.share])
+        self.assertIn("1 button folder found", st.alerts[-1][1])
+        st = self.press(self.folder_btn, switch="Show folders and buttons found")
+        self.assertEqual(st.switch[0][1], "1 script folder (your setting) -- live scripts on")
+        self.assertNotIn("\n", st.switch[0][1])                             # the menu shows one line
+        self.assertIn(self.share, st.alerts[-1][1])                          # the full list, readable
         self.assertIn("1 button folder found", st.alerts[-1][1])
         st = self.press(self.folder_btn, switch="Live scripts: turn off")
         self.assertIn("Live scripts: turn off", st.switch[0][0])
         self.assertFalse(ns.settings(self.ext)["live"])
         st = self.press(self.folder_btn, switch=None)                  # cancelled: nothing changes
         self.assertEqual(st.alerts, [])
+        other = os.path.join(self.tmp, "installed", "Netbuild 01.extension")
+        btn = write(os.path.join(other, "N.tab", "P.panel", "B.pushbutton", "script.py"), "x = 1\n")
+        st = self.press(self.folder_btn, switch="Add live scripts to other extensions...",
+                        folder=os.path.dirname(other))                    # Netbuild.extension itself is left out
+        self.assertIn("these 2 file(s)", st.alerts[0][1])
+        self.assertIn("2 file(s) changed", st.alerts[-1][1])
+        self.assertIn(ns.HEADER, read(btn))
 
     def test_update_button_and_live_level_shift(self):
         st = self.press(self.update_btn)

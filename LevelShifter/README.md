@@ -67,12 +67,38 @@ folder -- in whatever sub-folders you like. A button is matched by its folder na
   `%APPDATA%\Netbuild\pyRevit\backups\<time>`, then offers to reload pyRevit. Use it for laptops that
   work offline, or with live scripts off.
 
+**Netbuild Tools 01 / 02 tabs.** The same extension carries two more tabs (formerly the Studio-Claude
+extension's *Netbuild 01* / *Netbuild 02*): Schedules and Excel, Areas, Views and Links; Joins and Cuts,
+Floors, Walls, Warnings. Most of their buttons run a saved script (`CutFloorsAtColumns_MCP.py`,
+`schedule_roundtrip_*.py`, ...). They find it **by file name in any sub-folder of the script folders**, so
+moving a script between sub-folders of `OneDrive - Studio\Netbuild` needs no change to the button;
+the old `C:\SK\OneDrive\Netbuild\...` path is used only when the folders don't have it, and when neither
+does the button says where it looked. Remove `Studio-Claude.extension` once this one is installed, so the
+buttons don't show twice.
+
+**Other extensions.** Only buttons whose `script.py` starts with the two
+live-script lines (`import netbuild_scripts` / `netbuild_scripts.run_live(globals())`) run from the folder.
+To add them to another extension's buttons, use **Script Folder -> Add live scripts to other extensions...**
+in Revit and pick the `.extension` folder (or the folder holding several), or run
+
+```
+python LevelShifter\pyRevit\add_live_header.py "C:\pyRevit-Extensions\Netbuild 01.extension" "C:\pyRevit-Extensions\Netbuild 02.extension"
+```
+
+which lists the files, then again with `--apply` to change them. Every pushbutton / panelbutton `script.py`
+and `config.py` gets the lines after its docstring and `__title__` / `__author__` lines (smartbuttons are
+left alone: pyRevit runs them while loading the ribbon), `netbuild_scripts.py` is copied into the
+extension's `lib`, and every changed file is backed up to `%APPDATA%\Netbuild\pyRevit\backups\<time>`
+first. Running it again changes nothing. Button folder names must be unique across extensions -- a name in
+the script folder matches every installed button with that name.
+
 Which folder is used, first match wins:
 1. your own choice from **Script Folder** (`%APPDATA%\Netbuild\pyRevit\script_source.json`);
 2. the `NETBUILD_SCRIPT_SOURCE` environment variable (several folders separated by `;`) -- for an
    office-wide setting pushed by IT;
-3. the default shipped in `Netbuild.extension\script_source.json` (`"folders": []` -- none -- as shipped;
-   `%USERPROFILE%`-style variables are expanded).
+3. the default shipped in `Netbuild.extension\script_source.json`: both
+   `%USERPROFILE%\OneDrive - Studio\Netbuild` and its `scripts` sub-folder are scanned
+   (`%USERPROFILE%`-style variables are expanded; a folder inside another is searched once).
 
 To update the extension after changing the engine, run `python LevelShifter/sync_pyrevit_lib.py`.
 It copies the shared files into `Netbuild.extension\lib\level_shift`, and the tests fail while the

@@ -1,0 +1,10 @@
+title: |-
+  Import
+  Excel
+tooltip: >
+  Writes your edits from a workbook made by Export Schedule back into the model.
+  Pick the workbook and the parameters to import; a dry run lists every change,
+  conflicts (changed in Revit since the export) and borrowed / out-of-date
+  elements, which are skipped. Nothing is written until you click Yes. One
+  transaction (one Undo). Does not save or sync - Synchronize with Central after.
+author: "Netbuild -- skaec.com"

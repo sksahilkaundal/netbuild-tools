@@ -43,7 +43,11 @@ from sync_pyrevit_lib import SHARED  # noqa: E402
 IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DIRECT, APP, APP_CONFIG, ABOUT, LICENCE,
                                                                        FOLDER, UPDATE] +
                     [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py",
-                                                            "netbuild_about.py", "netbuild_scripts.py")])
+                                                            "netbuild_about.py", "netbuild_scripts.py",
+                                                            "netbuild_roundtrip.py")])
+BUTTON_SCRIPTS = sorted(os.path.join(d, n) for d, _, files in os.walk(EXT) for n in files
+                        if n in ("script.py", "config.py") and d.endswith(".pushbutton"))
+IRONPYTHON_FILES += [p for p in BUTTON_SCRIPTS if p not in IRONPYTHON_FILES]
 
 
 class ExtensionFileTests(unittest.TestCase):
@@ -98,6 +102,13 @@ class ExtensionFileTests(unittest.TestCase):
             self.assertIn('__author__ = "Netbuild -- skaec.com"', src, script_path)   # every button names its owner
             self.assertNotIn("SKAEC.COM", src, script_path)
             self.assertIn("netbuild_scripts.run_live(globals())", src, script_path)   # every button runs live
+        for script_path in BUTTON_SCRIPTS:                      # Netbuild Tools 01 / 02 too
+            with open(script_path, encoding="utf-8") as f:
+                src = f.read()
+            if script_path.endswith("script.py"):
+                self.assertIn('__author__ = "Netbuild -- skaec.com"', src, script_path)
+            self.assertIn("netbuild_scripts.run_live(globals())", src, script_path)
+        self.assertGreater(len(BUTTON_SCRIPTS), 20)
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Cleanup", "-", "Scripts", "-",
                                                 "About"])
