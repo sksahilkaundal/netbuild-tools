@@ -1,0 +1,10 @@
+title: |-
+  Restore GA
+  Link Views
+tooltip: >
+  Re-applies "By Linked View" (link TYPE row) on every GA Plan view placed on
+  the 10_GA Plans sheets: core link 3505-ProjectG-Studio-ARC-RVT-00003 to the matching
+  "<Level> GA Plan_Linked View" (paired by level elevation), and grid link
+  3505-ProjectG-Studio-ARC-BIM-00001 to its B / P2-L3 / GF-P1, L4-Roof views. Asks to
+  confirm first; both links must be loaded. Save and sync afterwards.
+author: Sahil Kaundal
