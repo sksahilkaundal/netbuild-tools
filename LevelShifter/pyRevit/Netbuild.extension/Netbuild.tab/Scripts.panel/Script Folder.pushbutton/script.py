@@ -22,6 +22,7 @@ import netbuild_scripts as ns
 TITLE = "Netbuild script folder"
 EXT = ns.extension_root(__file__)
 
+SHOW_ALL = "Show folders and buttons found"
 CHOOSE = "Choose the folder..."
 ADD = "Add another folder..."
 LIVE_ON = "Live scripts: turn on"
@@ -57,7 +58,7 @@ def add_to_other_extensions():
 
 s = ns.settings(EXT)
 choice = forms.CommandSwitchWindow.show(
-    [CHOOSE, ADD, LIVE_OFF if s["live"] else LIVE_ON, RESCAN, CLEAR, OTHERS], message=ns.describe(s))
+    [SHOW_ALL, CHOOSE, ADD, LIVE_OFF if s["live"] else LIVE_ON, RESCAN, CLEAR, OTHERS], message=ns.summary(s))
 if choice in (CHOOSE, ADD):
     folder = forms.pick_folder(title="Folder with the Netbuild button folders (sub-folders are searched)")
     if folder:

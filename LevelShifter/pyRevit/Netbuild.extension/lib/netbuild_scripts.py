@@ -497,6 +497,16 @@ def add_header(extensions, lib_file, apply=False, env=None):
 
 
 # ------------------------------------------------------------------ text
+def summary(s):
+    """One short line for the Script Folder menu (its message area shows one line)."""
+    if not s["folders"]:
+        return "No script folder -- buttons run their bundled scripts"
+    off = len([f for f in s["folders"] if not os.path.isdir(f)])
+    return "%d script folder%s (%s)%s -- live scripts %s" % (
+        len(s["folders"]), "" if len(s["folders"]) == 1 else "s", s["from"],
+        (", %d not reachable" % off) if off else "", "on" if s["live"] else "off")
+
+
 def describe(s, bundles=None):
     """The settings (and, given a scan, what was found) as text for the Script Folder button."""
     lines = []

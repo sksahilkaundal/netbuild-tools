@@ -344,8 +344,13 @@ class ScriptsPanelButtonTests(unittest.TestCase):
     def test_script_folder_button(self):
         write(os.path.join(self.share, "Revit", "Levels", "Level Shift.pushbutton", "script.py"), "")
         st = self.press(self.folder_btn, switch="Choose the folder...", folder=self.share)
-        self.assertIn("No script folder set", st.switch[0][1])
+        self.assertEqual(st.switch[0][1], "No script folder -- buttons run their bundled scripts")
         self.assertEqual(ns.settings(self.ext)["folders"], [self.share])
+        self.assertIn("1 button folder found", st.alerts[-1][1])
+        st = self.press(self.folder_btn, switch="Show folders and buttons found")
+        self.assertEqual(st.switch[0][1], "1 script folder (your setting) -- live scripts on")
+        self.assertNotIn("\n", st.switch[0][1])                             # the menu shows one line
+        self.assertIn(self.share, st.alerts[-1][1])                          # the full list, readable
         self.assertIn("1 button folder found", st.alerts[-1][1])
         st = self.press(self.folder_btn, switch="Live scripts: turn off")
         self.assertIn("Live scripts: turn off", st.switch[0][0])
