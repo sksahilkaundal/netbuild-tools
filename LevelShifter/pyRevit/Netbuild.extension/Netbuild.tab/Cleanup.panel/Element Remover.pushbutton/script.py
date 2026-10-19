@@ -11,6 +11,9 @@ About / Licence: the About and Licence buttons in the window, or Netbuild > Abou
 __title__ = "Element\nRemover"
 __author__ = "Netbuild -- skaec.com"
 
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 import datetime
 import io
 import os

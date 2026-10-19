@@ -23,6 +23,9 @@ APP = os.path.join(PANEL, "Level Shift App.pushbutton", "script.py")
 APP_CONFIG = os.path.join(PANEL, "Level Shift App.pushbutton", "config.py")
 ABOUT = os.path.join(EXT, "Netbuild.tab", "About.panel", "About.pushbutton", "script.py")
 LICENCE = os.path.join(EXT, "Netbuild.tab", "About.panel", "Licence.pushbutton", "script.py")
+SCRIPTS = os.path.join(EXT, "Netbuild.tab", "Scripts.panel")
+FOLDER = os.path.join(SCRIPTS, "Script Folder.pushbutton", "script.py")
+UPDATE = os.path.join(SCRIPTS, "Update Scripts.pushbutton", "script.py")
 APP_EXE = "Level Shift by Netbuild.exe"
 sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
@@ -37,9 +40,10 @@ import levelshift_ui  # noqa: E402
 sys.path.insert(0, os.path.join(ROOT))
 from sync_pyrevit_lib import SHARED  # noqa: E402
 
-IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DIRECT, APP, APP_CONFIG, ABOUT, LICENCE] +
+IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DIRECT, APP, APP_CONFIG, ABOUT, LICENCE,
+                                                                       FOLDER, UPDATE] +
                     [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py",
-                                                            "netbuild_about.py")])
+                                                            "netbuild_about.py", "netbuild_scripts.py")])
 
 
 class ExtensionFileTests(unittest.TestCase):
@@ -86,15 +90,17 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertIn("New elevation (mm)", ET.tostring(dlg, encoding="unicode"))
 
     def test_icons_and_titles(self):
-        for script_path in (DIRECT, APP, ABOUT, LICENCE):
+        for script_path in (DIRECT, APP, ABOUT, LICENCE, FOLDER, UPDATE):
             with open(os.path.join(os.path.dirname(script_path), "icon.png"), "rb") as f:
                 self.assertEqual(f.read(8), b"\x89PNG\r\n\x1a\n")
             with open(script_path, encoding="utf-8") as f:
                 src = f.read()
             self.assertIn('__author__ = "Netbuild -- skaec.com"', src, script_path)   # every button names its owner
             self.assertNotIn("SKAEC.COM", src, script_path)
+            self.assertIn("netbuild_scripts.run_live(globals())", src, script_path)   # every button runs live
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
-            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Cleanup", "-", "About"])
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Cleanup", "-", "Scripts", "-",
+                                                "About"])
         with open(os.path.join(EXT, "Netbuild.tab", "About.panel", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "About", "-", "Licence"])
 

@@ -8,6 +8,9 @@ Shift+Click: choose where the exe is.  (c) 2026 Netbuild. All rights reserved. h
 __title__ = "Level Shift\nApp"
 __author__ = "Netbuild -- skaec.com"
 
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 import os
 
 from pyrevit import forms, revit, script

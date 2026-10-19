@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Shift+Click: choose where LevelShifter.exe is."""
 
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 from pyrevit import forms, script
 
 import levelshift_app as app

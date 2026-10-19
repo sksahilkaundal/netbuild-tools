@@ -33,7 +33,8 @@ import elementremover_ui  # noqa: E402
 from sync_pyrevit_lib import DST, SHARED, SRC  # noqa: E402
 
 IRONPYTHON_FILES = ([os.path.join(SRC, n) for n in SHARED] + [BUTTON] +
-                    [os.path.join(EXT, "lib", n) for n in ("elementremover_ui.py", "netbuild_about.py")])
+                    [os.path.join(EXT, "lib", n) for n in ("elementremover_ui.py", "netbuild_about.py",
+                                                            "netbuild_scripts.py")])
 
 
 class ExtensionFileTests(unittest.TestCase):
@@ -94,8 +95,11 @@ class ExtensionFileTests(unittest.TestCase):
             src = f.read()
         self.assertIn('__author__ = "Netbuild -- skaec.com"', src)
         self.assertIn('__title__ = "Element\\nRemover"', src)
+        self.assertIn('__author__ = "Netbuild -- skaec.com"\n\nimport netbuild_scripts\n'
+                      'netbuild_scripts.run_live(globals())', src)          # runs from the script folder when set
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
-            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Cleanup", "-", "About"])  # About last
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Cleanup", "-", "Scripts", "-",
+                                                "About"])                                          # About last
 
 
 class ButtonTests(unittest.TestCase):
