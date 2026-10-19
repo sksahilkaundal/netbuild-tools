@@ -289,19 +289,29 @@ def plan_update(folders, extensions, env=None):
     return plan
 
 
+def _backup_dir(env=None):
+    return os.path.join(user_dir(env), "backups", time.strftime("%Y%m%d_%H%M%S"))
+
+
+def _back_up(path, backup):
+    """Copy path into backup, under its extension's folder name (nothing when path does not exist)."""
+    if not os.path.isfile(path):
+        return
+    ext = extension_root(path)
+    keep = os.path.join(backup, os.path.relpath(path, os.path.dirname(ext) if ext else os.path.dirname(path)))
+    if not os.path.isdir(os.path.dirname(keep)):
+        os.makedirs(os.path.dirname(keep))
+    shutil.copy2(path, keep)
+
+
 def apply_update(plan, env=None):
     """Copy every (source, installed) pair; the replaced files go to %APPDATA%\\Netbuild\\pyRevit\\backups\\<time>.
     Returns (files copied, [error lines], backup folder)."""
-    backup = os.path.join(user_dir(env), "backups", time.strftime("%Y%m%d_%H%M%S"))
+    backup = _backup_dir(env)
     copied, errors = 0, []
     for src, dst in plan:
         try:
-            if os.path.isfile(dst):
-                ext = extension_root(dst)
-                keep = os.path.join(backup, os.path.relpath(dst, os.path.dirname(ext) if ext else os.path.dirname(dst)))
-                if not os.path.isdir(os.path.dirname(keep)):
-                    os.makedirs(os.path.dirname(keep))
-                shutil.copy2(dst, keep)
+            _back_up(dst, backup)
             if not os.path.isdir(os.path.dirname(dst)):
                 os.makedirs(os.path.dirname(dst))
             shutil.copy2(src, dst)
@@ -309,6 +319,142 @@ def apply_update(plan, env=None):
         except (IOError, OSError) as e:
             errors.append("%s: %s" % (dst, e))
     return copied, errors, backup
+
+
+# ------------------------------------------------------------------ header for other extensions
+HEADER = ("import netbuild_scripts\n"
+          "netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one\n")
+HEADER_BUNDLES = (".pushbutton", ".panelbutton")    # not .smartbutton: pyRevit runs those while loading the ribbon
+HEADER_FILES = ("script.py", "config.py")
+_TRIPLE = re.compile(r"""^[rRuUbB]{0,2}(\"\"\"|\'\'\')""")
+_META = re.compile(r"^(__\w+__\s*=|from\s+__future__\s+import\b)")
+
+
+def _statement_end(lines, i):
+    """Index after the statement starting at lines[i] (follows open brackets and triple-quoted strings)."""
+    depth, quote = 0, None
+    while i < len(lines):
+        text = lines[i]
+        j = 0
+        while j < len(text):
+            if quote:
+                if text.startswith(quote, j):
+                    j, quote = j + len(quote), None
+                    continue
+            elif text.startswith('"""', j) or text.startswith("'''", j):
+                quote = text[j:j + 3]
+                j += 3
+                continue
+            elif text[j] in "\"'":
+                k = text.find(text[j], j + 1)
+                j = len(text) if k < 0 else k + 1
+                continue
+            elif text[j] == "#":
+                break
+            elif text[j] in "([{":
+                depth += 1
+            elif text[j] in ")]}":
+                depth -= 1
+            j += 1
+        i += 1
+        if not quote and depth <= 0 and not text.rstrip().endswith("\\"):
+            return i
+    return i
+
+
+def header_position(lines):
+    """Where the header goes: after the leading comments, the docstring, `from __future__` imports and the
+    __title__ / __author__ / ... lines at the top of the script."""
+    i, at = 0, 0
+    while i < len(lines) and (not lines[i].strip() or lines[i].lstrip().startswith("#")):
+        if lines[i].strip():
+            at = i + 1                  # keep #! and # -*- coding -*- lines first
+        i += 1
+    if i < len(lines) and (_TRIPLE.match(lines[i].strip()) or lines[i].strip()[:1] in "\"'"):
+        i = at = _statement_end(lines, i)
+    while i < len(lines):
+        text = lines[i].strip()
+        if not text or text.startswith("#"):
+            i += 1
+        elif _META.match(text):
+            i = at = _statement_end(lines, i)
+        else:
+            break
+    return at
+
+
+def with_header(source):
+    """source (text) with the run_live header added, or None when it already has it."""
+    if "netbuild_scripts.run_live(" in source:
+        return None
+    nl = "\r\n" if "\r\n" in source else "\n"
+    lines = source.splitlines(True)
+    at = header_position(lines)
+    before = lines[:at]
+    if before and not before[-1].endswith(("\n", "\r")):
+        before[-1] += nl
+    block = ([nl] if before else []) + [l + nl for l in HEADER.splitlines()]
+    after = lines[at:]
+    if after and after[0].strip():
+        block.append(nl)
+    return "".join(before + block + after)
+
+
+def extensions_in(folder):
+    """folder itself when it is a *.extension, else the *.extension folders directly in it."""
+    if not os.path.isdir(folder):
+        return []
+    if folder.lower().rstrip("\\/").endswith(".extension"):
+        return [folder]
+    return [os.path.join(folder, n) for n in sorted(os.listdir(folder))
+            if n.lower().endswith(".extension") and os.path.isdir(os.path.join(folder, n))]
+
+
+def add_header(extensions, lib_file, apply=False, env=None):
+    """Add the run_live header to every button script.py / config.py in extensions and copy lib_file
+    (netbuild_scripts.py) into each extension's lib, so the import works there too. With apply=False only report.
+    Returns ([files changed or to change], [(file, reason) skipped], backup folder or None)."""
+    changed, skipped = [], []
+    backup = _backup_dir(env) if apply else None
+    for ext in extensions:
+        for d, dirs, files in os.walk(ext):
+            dirs[:] = sorted(n for n in dirs if n not in SKIP_DIRS)
+            if not os.path.basename(d).lower().endswith(BUNDLES):
+                continue
+            dirs[:] = []
+            for name in sorted(files):
+                if name.lower() not in HEADER_FILES:
+                    continue
+                path = os.path.join(d, name)
+                if not d.lower().endswith(HEADER_BUNDLES):
+                    skipped.append((path, "a %s runs while pyRevit loads" % os.path.splitext(d)[1]))
+                    continue
+                with io.open(path, "rb") as f:
+                    raw = f.read()
+                bom = raw.startswith(b"\xef\xbb\xbf")
+                try:
+                    text = raw[3 if bom else 0:].decode("utf-8")
+                except UnicodeDecodeError:
+                    skipped.append((path, "not UTF-8 text"))
+                    continue
+                new = with_header(text)
+                if new is None:
+                    skipped.append((path, "already has the header"))
+                    continue
+                changed.append(path)
+                if apply:
+                    _back_up(path, backup)
+                    with io.open(path, "wb") as f:
+                        f.write((b"\xef\xbb\xbf" if bom else b"") + new.encode("utf-8"))
+        lib = os.path.join(ext, "lib", os.path.basename(lib_file))
+        if _key(lib) != _key(lib_file) and _differs(lib_file, lib):
+            changed.append(lib)
+            if apply:
+                _back_up(lib, backup)
+                if not os.path.isdir(os.path.dirname(lib)):
+                    os.makedirs(os.path.dirname(lib))
+                shutil.copy2(lib_file, lib)
+    return changed, skipped, backup
 
 
 # ------------------------------------------------------------------ text

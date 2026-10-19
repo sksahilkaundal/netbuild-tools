@@ -66,6 +66,22 @@ folder -- in whatever sub-folders you like. A button is matched by its folder na
   `%APPDATA%\Netbuild\pyRevit\backups\<time>`, then offers to reload pyRevit. Use it for laptops that
   work offline, or with live scripts off.
 
+**Other extensions (e.g. Netbuild 01, Netbuild 02).** Only buttons whose `script.py` starts with the two
+live-script lines (`import netbuild_scripts` / `netbuild_scripts.run_live(globals())`) run from the folder.
+To add them to another extension's buttons, use **Script Folder -> Add live scripts to other extensions...**
+in Revit and pick the `.extension` folder (or the folder holding several), or run
+
+```
+python LevelShifter\pyRevit\add_live_header.py "C:\pyRevit-Extensions\Netbuild 01.extension" "C:\pyRevit-Extensions\Netbuild 02.extension"
+```
+
+which lists the files, then again with `--apply` to change them. Every pushbutton / panelbutton `script.py`
+and `config.py` gets the lines after its docstring and `__title__` / `__author__` lines (smartbuttons are
+left alone: pyRevit runs them while loading the ribbon), `netbuild_scripts.py` is copied into the
+extension's `lib`, and every changed file is backed up to `%APPDATA%\Netbuild\pyRevit\backups\<time>`
+first. Running it again changes nothing. Button folder names must be unique across extensions -- a name in
+the script folder matches every installed button with that name.
+
 Which folder is used, first match wins:
 1. your own choice from **Script Folder** (`%APPDATA%\Netbuild\pyRevit\script_source.json`);
 2. the `NETBUILD_SCRIPT_SOURCE` environment variable (several folders separated by `;`) -- for an
