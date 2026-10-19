@@ -94,7 +94,7 @@ class ExtensionFileTests(unittest.TestCase):
             self.assertIn('__author__ = "Netbuild -- skaec.com"', src, script_path)   # every button names its owner
             self.assertNotIn("SKAEC.COM", src, script_path)
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
-            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "About"])
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Cleanup", "-", "About"])
         with open(os.path.join(EXT, "Netbuild.tab", "About.panel", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "About", "-", "Licence"])
 
@@ -268,6 +268,7 @@ class ButtonTests(unittest.TestCase):
     def test_about_button(self):
         st = pyrevit_stubs.install(self.doc)
         runpy.run_path(ABOUT, run_name="__main__")
+        self.assertEqual(st.lists[-1][1][0], "Level Shift by Netbuild")      # every Netbuild product is listed
         win = pyrevit_stubs.WPFWindow.shown[-1]
         self.check_about(win)
         win.copy_btn.click()

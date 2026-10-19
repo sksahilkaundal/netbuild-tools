@@ -28,8 +28,9 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
 3. Register that folder with pyRevit, then **Reload**. You can do this in either of two ways:
    - **pyRevit → Settings → Custom Extension Directories**;
    - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
-4. A **Netbuild** tab appears with two panels:
+4. A **Netbuild** tab appears with these panels:
    - **Levels**, holding **Level Shift** and **Level Shift App**;
+   - **Cleanup**, holding **Element Remover** (see [`ElementRemover/`](../ElementRemover/README.md));
    - **About**, holding **About** (product info, version, requirements) and **Licence** (the licensing page).
 
 When **Level Shift App** can't find the exe, it asks for it once. It looks in this order:
