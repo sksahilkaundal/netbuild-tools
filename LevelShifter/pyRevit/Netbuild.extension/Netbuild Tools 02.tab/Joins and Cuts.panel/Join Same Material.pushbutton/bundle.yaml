@@ -3,4 +3,4 @@ title: |-
   Material
 tooltip: >
   Joins Wall-Wall, Wall-Floor, Floor-Floor pairs sharing a material keyword; floor always kept dominant. Curtain walls excluded except a configured type.
-author: Sahil Kaundal
+author: "Netbuild -- skaec.com"

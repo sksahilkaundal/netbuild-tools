@@ -31,6 +31,7 @@ BUNDLES = (".pushbutton", ".smartbutton", ".invokebutton", ".urlbutton", ".linkb
 SKIP_DIRS = (".git", ".svn", "__pycache__", "node_modules")
 SKIP_EXT = (".pyc", ".pyo")
 LIVE_KEY = "__netbuild_live__"  # set in the scope of a script run from the script folder
+INDEX_VERSION = 2               # 2: the index also holds the .py files (script_path)
 
 
 # ------------------------------------------------------------------ settings
@@ -121,13 +122,16 @@ def _inside(path, root):
 
 
 def _newest(folder):
+    if os.path.isfile(folder):
+        return os.path.getmtime(folder)
     times = [os.path.getmtime(os.path.join(folder, n)) for n in os.listdir(folder)
              if os.path.isfile(os.path.join(folder, n))]
     return max(times) if times else 0
 
 
 def scan(folders):
-    """{lower-case folder name: [paths, newest first]} for every button folder and .extension folder below folders."""
+    """{lower-case name: [paths, newest first]} for every button folder, .extension folder and .py file below
+    folders (not the files inside button folders)."""
     found, seen = {}, set()
     for root in folders:
         if not os.path.isdir(root):
@@ -140,6 +144,11 @@ def scan(folders):
                 found.setdefault(name, []).append(d)
             if name.endswith(BUNDLES):
                 dirs[:] = []                    # a button folder holds no buttons
+                continue
+            for n in files:
+                if n.lower().endswith(".py") and _key(os.path.join(d, n)) not in seen:
+                    seen.add(_key(os.path.join(d, n)))
+                    found.setdefault(n.lower(), []).append(os.path.join(d, n))
     for name in found:
         found[name].sort(key=_newest, reverse=True)
     return found
@@ -147,7 +156,7 @@ def scan(folders):
 
 def rescan(folders, env=None):
     """Scan folders now and save the index the buttons look in."""
-    data = {"folders": folders, "scanned": time.time(), "bundles": scan(folders)}
+    data = {"folders": folders, "scanned": time.time(), "bundles": scan(folders), "version": INDEX_VERSION}
     try:
         _write_json(os.path.join(user_dir(env), INDEX_NAME), data)
     except (IOError, OSError):
@@ -156,19 +165,49 @@ def rescan(folders, env=None):
 
 
 def find_bundle(name, folders, exclude=(), env=None):
-    """The newest folder called name below folders and outside exclude, or None. Uses the saved index; scans again
-    when the folders changed, or when the folder is missing and the index is older than RESCAN_SECONDS."""
+    """The newest folder (or .py file) called name below folders and outside exclude, or None. Uses the saved index;
+    scans again when the folders changed, or when name is missing and the index is older than RESCAN_SECONDS."""
     data = _read_json(os.path.join(user_dir(env), INDEX_NAME))
-    fresh = data.get("folders") == folders
+    fresh = data.get("folders") == folders and data.get("version") == INDEX_VERSION
     for attempt in (0, 1):
         if fresh:
             for d in (data.get("bundles") or {}).get(name.lower(), []):
-                if os.path.isdir(d) and not [x for x in exclude if _inside(d, x)]:
+                if os.path.exists(d) and not [x for x in exclude if _inside(d, x)]:
                     return d
             if attempt or time.time() - data.get("scanned", 0) < RESCAN_SECONDS:
                 return None
         data, fresh = {"bundles": rescan(folders, env)}, True
     return None
+
+
+# ------------------------------------------------------------------ scripts the buttons run by name
+def script_path(name, fallback=None, env=None):
+    """The newest file called name (e.g. "CutFloorsAtColumns_MCP.py") anywhere below the script folders; else
+    fallback when that file exists; else None. A name not in the index makes the folders be scanned again."""
+    try:
+        folders = settings(extension_root(__file__), env)["folders"]
+        if folders:
+            found = find_bundle(name, folders, env=env)
+            if found is None:
+                rescan(folders, env)            # added since the last scan?
+                found = find_bundle(name, folders, env=env)
+            if found and os.path.isfile(found):
+                return found
+    except Exception:           # an offline share or a bad setting: try the fallback
+        pass
+    return fallback if fallback and os.path.isfile(fallback) else None
+
+
+def missing_text(name, fallback=None, env=None):
+    """Why script_path(name) found nothing, for an alert."""
+    folders = settings(extension_root(__file__), env)["folders"]
+    lines = ["%s was not found." % name, "", "Looked in every sub-folder of:"]
+    lines += ["    %s%s" % (f, "" if os.path.isdir(f) else "   -- not reachable") for f in folders] or \
+        ["    (no script folder set)"]
+    if fallback:
+        lines.append("and at:\n    %s" % fallback)
+    lines += ["", "Put the script in one of those folders, or set the folder with Netbuild > Script Folder."]
+    return "\n".join(lines)
 
 
 # ------------------------------------------------------------------ live

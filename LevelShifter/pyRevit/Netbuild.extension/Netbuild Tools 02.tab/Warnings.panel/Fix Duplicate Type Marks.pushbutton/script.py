@@ -4,6 +4,12 @@ folder inside Revit, providing the same doc/uidoc/DB/System/print context
 that the Revit MCP execute_revit_code tool gives it. Edit the source file
 directly (not this wrapper) to change behavior or hardcoded values.
 """
+
+__author__ = "Netbuild -- skaec.com"
+
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 import System
 from pyrevit import revit, DB, forms, script
 
@@ -11,7 +17,13 @@ doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
 
-SCRIPT_PATH = r"C:\SK\OneDrive\Netbuild\FixDuplicateTypeMarks_MCP.py"
+# Found by name in any sub-folder of the script folders (Netbuild > Script Folder);
+# OLD_PATH is used when they do not have it.
+SCRIPT_NAME = "FixDuplicateTypeMarks_MCP.py"
+OLD_PATH = r"C:\SK\OneDrive\Netbuild\FixDuplicateTypeMarks_MCP.py"
+SCRIPT_PATH = netbuild_scripts.script_path(SCRIPT_NAME, OLD_PATH)
+if not SCRIPT_PATH:
+    forms.alert(netbuild_scripts.missing_text(SCRIPT_NAME, OLD_PATH), title="Fix Duplicate Type Marks", exitscript=True)
 
 proceed = forms.alert(
     "This will auto-resolve duplicate Type Mark warnings across the ACTIVE document by editing Type Mark values. This modifies element types (affects ALL instances of each type). Continue?",

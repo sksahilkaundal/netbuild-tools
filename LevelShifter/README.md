@@ -66,7 +66,16 @@ folder -- in whatever sub-folders you like. A button is matched by its folder na
   `%APPDATA%\Netbuild\pyRevit\backups\<time>`, then offers to reload pyRevit. Use it for laptops that
   work offline, or with live scripts off.
 
-**Other extensions (e.g. Netbuild 01, Netbuild 02).** Only buttons whose `script.py` starts with the two
+**Netbuild Tools 01 / 02 tabs.** The same extension carries two more tabs (formerly the Studio-Claude
+extension's *Netbuild 01* / *Netbuild 02*): Schedules and Excel, Areas, Views and Links; Joins and Cuts,
+Floors, Walls, Warnings. Most of their buttons run a saved script (`CutFloorsAtColumns_MCP.py`,
+`schedule_roundtrip_*.py`, ...). They find it **by file name in any sub-folder of the script folders**, so
+moving a script between sub-folders of `OneDrive - Studio\Netbuild` needs no change to the button;
+the old `C:\SK\OneDrive\Netbuild\...` path is used only when the folders don't have it, and when neither
+does the button says where it looked. Remove `Studio-Claude.extension` once this one is installed, so the
+buttons don't show twice.
+
+**Other extensions.** Only buttons whose `script.py` starts with the two
 live-script lines (`import netbuild_scripts` / `netbuild_scripts.run_live(globals())`) run from the folder.
 To add them to another extension's buttons, use **Script Folder -> Add live scripts to other extensions...**
 in Revit and pick the `.extension` folder (or the folder holding several), or run

@@ -5,6 +5,12 @@ it. Restores "By Linked View" on every GA Plan view on the 10_GA Plans sheets
 for the core link (...-00003) and the grid link (...-BIM-00001), on the link
 TYPE row. Edit the source script (CONFIG block), not this wrapper.
 """
+
+__author__ = "Netbuild -- skaec.com"
+
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 import System
 from pyrevit import revit, DB, forms, script
 
@@ -12,7 +18,13 @@ doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
 
-SCRIPT_PATH = r"C:\SK\OneDrive\Netbuild\scripts\restore_ga_plan_link_views.py"
+# Found by name in any sub-folder of the script folders (Netbuild > Script Folder);
+# OLD_PATH is used when they do not have it.
+SCRIPT_NAME = "restore_ga_plan_link_views.py"
+OLD_PATH = r"C:\SK\OneDrive\Netbuild\scripts\restore_ga_plan_link_views.py"
+SCRIPT_PATH = netbuild_scripts.script_path(SCRIPT_NAME, OLD_PATH)
+if not SCRIPT_PATH:
+    forms.alert(netbuild_scripts.missing_text(SCRIPT_NAME, OLD_PATH), title="Restore GA Link Views", exitscript=True)
 
 proceed = forms.alert(
     "Restore 'By Linked View' on all GA Plan views (10_GA Plans sheets) for:\n\n"

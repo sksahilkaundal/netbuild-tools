@@ -4,8 +4,14 @@
 Diffs the workbook against its hidden _Original sheet (keyed on Element ID), runs a DRY RUN
 (conflicts, borrowed / out-of-date elements are skipped and listed), and writes only after
 you click Yes. One transaction = one undo step. Does not save or sync.
-Logic: lib\\netbuild_roundtrip.py -> C:\\SK\\OneDrive\\Netbuild\\scripts\\schedule_roundtrip_*.py
+Logic: lib\\netbuild_roundtrip.py -> schedule_roundtrip_*.py in the script folders
 """
+
+__author__ = "Netbuild -- skaec.com"
+
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 from collections import Counter
 
 from pyrevit import revit, DB, forms, script
@@ -16,6 +22,8 @@ doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
 TITLE = "Import Excel to Revit"
+if nr.check_scripts():
+    forms.alert(nr.check_scripts(), title=TITLE, exitscript=True)
 
 path = forms.pick_file(file_ext="xlsx", init_dir=nr.default_dir(create=False),
                        title=TITLE + " - pick the edited workbook")

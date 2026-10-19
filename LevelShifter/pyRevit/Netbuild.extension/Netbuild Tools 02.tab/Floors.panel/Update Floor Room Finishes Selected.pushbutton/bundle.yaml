@@ -3,4 +3,4 @@ title: |-
   Finishes (Sel)
 tooltip: >
   Rebuilds the SELECTED floor's sketch to one closed loop per room at wall finish faces. Select a floor before running.
-author: Sahil Kaundal
+author: "Netbuild -- skaec.com"

@@ -11,6 +11,11 @@ it contains one closed loop per room. You end up with a single floor whose
 edges follow the internal (finish) faces of the walls around every room.
 """
 
+__author__ = "Netbuild -- skaec.com"
+
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 from System.Collections.Generic import List
 
 from pyrevit import revit, forms, script

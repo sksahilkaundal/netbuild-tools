@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Shared logic for the Netbuild 01 > Schedules and Excel buttons (Export Schedule / Import Excel).
+"""Shared logic for the Netbuild Tools 01 > Schedules and Excel buttons (Export Schedule / Import Excel).
 
 Revit side runs the same scripts the Revit MCP uses (exec with doc/uidoc/DB/System),
-Excel side runs CPython 3.14 + openpyxl in a child process. Source scripts live in
-C:\\SK\\OneDrive\\Netbuild\\scripts (skill: schedule-roundtrip-excel) - edit them there,
-not here. IronPython 2.7 compatible (Revit 2023+).
+Excel side runs CPython 3.14 + openpyxl in a child process. The schedule_roundtrip_*.py source
+scripts are found by name in any sub-folder of the script folders (Netbuild > Script Folder,
+skill: schedule-roundtrip-excel), else in OLD_SCRIPTS - edit them there, not here.
+IronPython 2.7 compatible (Revit 2023+).
 """
 import datetime
 import json
@@ -15,14 +16,22 @@ import System
 from System.Diagnostics import Process, ProcessStartInfo
 from Autodesk.Revit import DB
 
-NETBUILD = r"C:\SK\OneDrive\Netbuild"
-SCRIPTS = os.path.join(NETBUILD, "scripts")
-DUMP = os.path.join(SCRIPTS, "schedule_roundtrip_dump.py")
-BUILD = os.path.join(SCRIPTS, "schedule_roundtrip_build_grouped_xlsx.py")
-TOOLS = os.path.join(SCRIPTS, "schedule_roundtrip_plugin_tools.py")
-DIFF = os.path.join(SCRIPTS, "schedule_roundtrip_import_diff.py")
-IMPORT = os.path.join(SCRIPTS, "schedule_roundtrip_import.py")
-AREA_REF = os.path.join(SCRIPTS, "templates", "schedule_roundtrip_area_reference.xlsx")
+import netbuild_scripts
+
+OLD_SCRIPTS = r"C:\SK\OneDrive\Netbuild\scripts"     # used when the script folders do not have a script
+
+
+def _script(name):
+    old = os.path.join(OLD_SCRIPTS, name)
+    return netbuild_scripts.script_path(name, old) or old
+
+
+DUMP = _script("schedule_roundtrip_dump.py")
+BUILD = _script("schedule_roundtrip_build_grouped_xlsx.py")
+TOOLS = _script("schedule_roundtrip_plugin_tools.py")
+DIFF = _script("schedule_roundtrip_import_diff.py")
+IMPORT = _script("schedule_roundtrip_import.py")
+AREA_REF = os.path.join(os.path.dirname(DUMP), "templates", "schedule_roundtrip_area_reference.xlsx")
 EXPORT_ROOT = r"C:\SK\Projects\ProjectA\Exports"
 DEFAULT_PARAMS = ["Studio_Function Code", "Studio_Sub-Function Code", "Studio_Area_Department"]
 
@@ -32,6 +41,14 @@ class RoundTripError(Exception):
 
 
 # ---- helpers -------------------------------------------------------------------------
+def check_scripts():
+    """None when every round-trip script was found, else the text for an alert."""
+    for path in (DUMP, BUILD, TOOLS, DIFF, IMPORT):
+        if not os.path.isfile(path):
+            return netbuild_scripts.missing_text(os.path.basename(path), path)
+    return None
+
+
 def safe_name(s):
     return re.sub(r'[<>:"/\\|?*]', "-", s).strip()
 
@@ -55,7 +72,7 @@ def is_locked(path):
         return False
     try:
         fs = System.IO.File.Open(path, System.IO.FileMode.Open, System.IO.FileAccess.ReadWrite,
-                                 System.IO.FileShare.None)
+                                 getattr(System.IO.FileShare, "None"))   # .None: a keyword in Python 3
         fs.Close()
         return False
     except System.IO.IOException:

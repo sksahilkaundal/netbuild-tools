@@ -4,6 +4,7 @@ script from the folder, Update Scripts, and the two Scripts-panel buttons (stub 
     python -m unittest discover -s LevelShifter/tests -v
 """
 
+import contextlib
 import io
 import os
 import runpy
@@ -214,13 +215,89 @@ class HeaderTests(unittest.TestCase):
         btn = write(os.path.join(ext, "T.tab", "P.panel", "B.pushbutton", "script.py"), "x = 2\n")
         os.environ["APPDATA"] = self.env["APPDATA"]
         try:
-            self.assertEqual(add_live_header.main([ext]), 0)
-            self.assertEqual(read(btn), "x = 2\n")
-            self.assertEqual(add_live_header.main([ext, "--apply"]), 0)
-            self.assertIn(ns.HEADER, read(btn))
-            self.assertEqual(add_live_header.main([os.path.join(self.tmp, "nothing-here")]), 1)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.cli(add_live_header, ext, btn)
         finally:
             os.environ.pop("APPDATA", None)
+
+    def cli(self, add_live_header, ext, btn):
+        self.assertEqual(add_live_header.main([ext]), 0)
+        self.assertEqual(read(btn), "x = 2\n")
+        self.assertEqual(add_live_header.main([ext, "--apply"]), 0)
+        self.assertIn(ns.HEADER, read(btn))
+        self.assertEqual(add_live_header.main([os.path.join(self.tmp, "nothing-here")]), 1)
+
+
+class ScriptPathTests(unittest.TestCase):
+    """Netbuild Tools 01 / 02: the wrapper buttons find the script they run by file name in the script folders."""
+
+    TOOLS = [os.path.join(EXT, "Netbuild Tools 01.tab"), os.path.join(EXT, "Netbuild Tools 02.tab")]
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self._env = dict(os.environ)
+        os.environ["APPDATA"] = os.path.join(self.tmp, "appdata")
+        os.environ.pop(ns.ENV, None)
+        self.share = os.path.join(self.tmp, "OneDrive - Studio", "Netbuild")
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._env)
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def wrappers(self):
+        out = []
+        for tab in self.TOOLS:
+            for d, _, files in os.walk(tab):
+                if "script.py" in files and "SCRIPT_NAME = " in read(os.path.join(d, "script.py")):
+                    out.append(os.path.join(d, "script.py"))
+        return sorted(out)
+
+    def test_script_path(self):
+        ns.save_settings(folders=[self.share, os.path.join(self.share, "scripts")])     # nested, like the default
+        deep = write(os.path.join(self.share, "scripts", "2026", "JoinSameMaterial_MCP.py"), "x = 1\n")
+        self.assertEqual(ns.script_path("joinsamematerial_mcp.py"), deep)               # any depth, any case
+        late = write(os.path.join(self.share, "Late_MCP.py"), "")
+        self.assertEqual(ns.script_path("Late_MCP.py"), late)          # added after the last scan: scanned again
+        old = write(os.path.join(self.tmp, "SK", "Old_MCP.py"), "")
+        self.assertEqual(ns.script_path("Old_MCP.py", old), old)       # not in the folders: the old path
+        self.assertIsNone(ns.script_path("Gone_MCP.py", os.path.join(self.tmp, "nope.py")))
+        text = ns.missing_text("Gone_MCP.py", r"C:\SK\Gone_MCP.py")
+        self.assertIn("Gone_MCP.py was not found.", text)
+        self.assertIn(self.share, text)
+        self.assertIn(r"C:\SK\Gone_MCP.py", text)
+        write(os.path.join(self.share, "B.pushbutton", "Inside_MCP.py"), "")             # button files: not scripts
+        self.assertIsNone(ns.script_path("Inside_MCP.py"))
+
+    def test_every_wrapper_looks_its_script_up_by_name(self):
+        wrappers = self.wrappers()
+        self.assertEqual(len(wrappers), 15)
+        for p in wrappers:
+            src = read(p)
+            name = src.split('SCRIPT_NAME = "', 1)[1].split('"', 1)[0]
+            old = src.split('OLD_PATH = r"', 1)[1].split('"', 1)[0]
+            self.assertEqual(name, old.split("\\")[-1], p)
+            self.assertIn("SCRIPT_PATH = netbuild_scripts.script_path(SCRIPT_NAME, OLD_PATH)", src, p)
+            self.assertLess(src.index("SCRIPT_PATH = netbuild_scripts"), src.index("open(SCRIPT_PATH"), p)
+
+    def test_wrapper_runs_the_script_from_the_folder(self):
+        fake = FakeRevit()
+        try:
+            ns.save_settings(folders=[self.share])
+            btn = [p for p in self.wrappers() if "Floor Plate Area" in p][0]
+            st = pyrevit_stubs.install(fake.doc)
+            with self.assertRaises(pyrevit_stubs.ScriptExit):          # not there: says where it looked
+                runpy.run_path(btn, run_name="__main__")
+            self.assertIn("floor_plate_area.py was not found", st.alerts[-1][1])
+            self.assertIn(self.share, st.alerts[-1][1])
+            write(os.path.join(self.share, "Areas", "floor_plate_area.py"), "System.ran = (doc, __file__)\n")
+            st = pyrevit_stubs.install(fake.doc)
+            runpy.run_path(btn, run_name="__main__")
+            self.assertEqual(sys.modules["System"].ran,
+                             (fake.doc, os.path.join(self.share, "Areas", "floor_plate_area.py")))
+            self.assertIn("**Done.**", st.printed[-1])
+        finally:
+            fake.close()
 
 
 class ShippedDefaultTests(unittest.TestCase):

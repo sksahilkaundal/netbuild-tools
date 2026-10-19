@@ -3,4 +3,4 @@ title: |-
   Finishes
 tooltip: >
   Draw one rough floor, run this, and it rewrites the sketch to one closed loop per room at wall finish faces. Prompts you to pick the floor interactively if none is pre-selected.
-author: Sahil Kaundal
+author: "Netbuild -- skaec.com"

@@ -3,4 +3,4 @@ title: |-
   Planter Split
 tooltip: >
   Curtain Wall Planter Split — discovers target curtain wall instances in the active document, verifies required types exist, and runs the split / concrete-conversion / glass-merge / mullion-cleanup pipeline floor-wise. Confirms with you before committing. Does NOT save or sync the document.
-author: Sahil Kaundal
+author: "Netbuild -- skaec.com"

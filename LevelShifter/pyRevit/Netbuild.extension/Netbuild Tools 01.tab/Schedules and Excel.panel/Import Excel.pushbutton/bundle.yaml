@@ -7,4 +7,4 @@ tooltip: >
   conflicts (changed in Revit since the export) and borrowed / out-of-date
   elements, which are skipped. Nothing is written until you click Yes. One
   transaction (one Undo). Does not save or sync - Synchronize with Central after.
-author: Sahil Kaundal
+author: "Netbuild -- skaec.com"

@@ -20,6 +20,12 @@ which are standard across this project's buildings — but the concrete wall
 type has been missing on 2 of the buildings tried so far, so this script
 will stop and tell you rather than silently substituting or auto-creating it.
 """
+
+__author__ = "Netbuild -- skaec.com"
+
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 import System
 from pyrevit import revit, DB, forms, script
 

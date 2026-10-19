@@ -6,6 +6,12 @@ save location/filename each run (defaulting to the ProjectA Exports
 date-stamped folder) instead of always overwriting the same file.
 Edit the source file directly (not this wrapper) to change export logic.
 """
+
+__author__ = "Netbuild -- skaec.com"
+
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 import os
 import datetime
 import System
@@ -15,7 +21,13 @@ doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
 
-SCRIPT_PATH = r"C:\SK\OneDrive\Netbuild\export_rooms_to_excel.py"
+# Found by name in any sub-folder of the script folders (Netbuild > Script Folder);
+# OLD_PATH is used when they do not have it.
+SCRIPT_NAME = "export_rooms_to_excel.py"
+OLD_PATH = r"C:\SK\OneDrive\Netbuild\export_rooms_to_excel.py"
+SCRIPT_PATH = netbuild_scripts.script_path(SCRIPT_NAME, OLD_PATH)
+if not SCRIPT_PATH:
+    forms.alert(netbuild_scripts.missing_text(SCRIPT_NAME, OLD_PATH), title="Export Rooms Excel", exitscript=True)
 
 DEFAULT_BASE_DIR = r"C:\Users\user\OneDrive - Studio\Projects\ProjectA\Exports"
 default_date_dir = os.path.join(DEFAULT_BASE_DIR, datetime.date.today().strftime("%Y-%m-%d"))

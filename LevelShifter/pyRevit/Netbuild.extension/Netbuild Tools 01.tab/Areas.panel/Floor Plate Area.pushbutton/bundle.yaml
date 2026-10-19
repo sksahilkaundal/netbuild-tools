@@ -3,4 +3,4 @@ title: |-
   Area
 tooltip: >
   Computes net floor plate area for a level from the exterior curtain wall envelope minus shaft openings. Edit LEVEL_NAME in the source file first.
-author: Sahil Kaundal
+author: "Netbuild -- skaec.com"

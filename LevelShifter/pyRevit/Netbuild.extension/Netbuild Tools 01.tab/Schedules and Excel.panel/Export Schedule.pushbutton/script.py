@@ -4,8 +4,14 @@
 Host-model elements only (linked rows are left out). Area schedules that hold every column of
 the curated Area layout get that layout; any other schedule gets all its visible columns in
 the same style. Element ID is column A - the Import Excel button keys on it.
-Logic: lib\\netbuild_roundtrip.py -> C:\\SK\\OneDrive\\Netbuild\\scripts\\schedule_roundtrip_*.py
+Logic: lib\\netbuild_roundtrip.py -> schedule_roundtrip_*.py in the script folders
 """
+
+__author__ = "Netbuild -- skaec.com"
+
+import netbuild_scripts
+netbuild_scripts.run_live(globals())       # the script folder's copy of this button, when there is one
+
 import datetime
 import os
 
@@ -17,6 +23,8 @@ doc = revit.doc
 uidoc = revit.uidoc
 output = script.get_output()
 TITLE = "Export Schedule to Excel"
+if nr.check_scripts():
+    forms.alert(nr.check_scripts(), title=TITLE, exitscript=True)
 
 view, seen = nr.active_schedule(doc, uidoc)
 problem = nr.check_schedule(view, seen)
