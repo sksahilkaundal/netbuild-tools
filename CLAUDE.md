@@ -24,6 +24,9 @@ Owner and publisher: **Netbuild**. Website: **https://skaec.com**. Brand: **Netb
   discipline (e.g. `Levels.panel`), plus the **About** panel (`About.panel/About.pushbutton` and
   `Licence.pushbutton`), which
   stays last (`Netbuild.tab/bundle.yaml` `layout:`). Button `__author__ = "Netbuild -- skaec.com"`.
+- Every button script (`script.py`, and `config.py` when there is one) starts, right after `__author__`, with
+  `import netbuild_scripts` / `netbuild_scripts.run_live(globals())`, so it runs from the script folder
+  (**Netbuild -> Scripts -> Script Folder**, `lib/netbuild_scripts.py`) when one is set. Tests enforce this.
 
 ## About (required in every product)
 Each product has one `about.py` (see `LevelShifter/level_shift/about.py`) that is the single source for:

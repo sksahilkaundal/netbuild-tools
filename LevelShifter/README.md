@@ -28,8 +28,9 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
 3. Register that folder with pyRevit, then **Reload**. You can do this in either of two ways:
    - **pyRevit → Settings → Custom Extension Directories**;
    - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
-4. A **Netbuild** tab appears with two panels:
+4. A **Netbuild** tab appears with three panels:
    - **Levels**, holding **Level Shift** and **Level Shift App**;
+   - **Scripts**, holding **Script Folder** and **Update Scripts** (see *Script folder* below);
    - **About**, holding **About** (product info, version, requirements) and **Licence** (the licensing page).
 
 When **Level Shift App** can't find the exe, it asks for it once. It looks in this order:
@@ -40,6 +41,37 @@ When **Level Shift App** can't find the exe, it asks for it once. It looks in th
 **Level Shift** (direct) keeps its options in the pyRevit config: units, tolerance, *move back
 elements without an offset parameter*, and *undo all if anything moves*. It writes logs and element
 CSVs to `%APPDATA%\Netbuild\LevelShift\logs`.
+
+### Script folder: update every button from one place
+
+Keep the current button folders in one place -- a network share, or a synced OneDrive / ACC / BIM 360
+folder -- in whatever sub-folders you like. A button is matched by its folder name, at any depth:
+
+```
+\\server\BIM\Netbuild scripts\
+    Levels\2026\Level Shift.pushbutton\script.py      <- runs when you click Level Shift
+    Masters\Netbuild.extension\lib\...                 <- lib of a same-named extension (Update Scripts)
+```
+
+- **Script Folder** sets the folder (or several), turns *live scripts* on / off and looks in the folder
+  again. It shows which buttons were found, and any button found more than once (the newest copy wins).
+- **Live scripts on** (the default): every Netbuild button runs its `script.py` (and Shift+Click `config.py`)
+  from the folder, so a change there reaches everyone on their next click -- no copying, no reload. The
+  copy bundled in the extension runs when no folder is set, the folder is offline, or the button is not in
+  it. A new button found in the folder is picked up within 5 minutes, or at once with *look in the folder
+  again*. Library modules already loaded by pyRevit stay loaded until pyRevit reloads.
+- **Update Scripts** copies the changed files of every installed button found in the folder -- and the
+  `lib` folder of a same-named `.extension` there -- into the installed extensions (this one and the
+  others in pyRevit's extension folders). It lists the files first, backs up the replaced ones to
+  `%APPDATA%\Netbuild\pyRevit\backups\<time>`, then offers to reload pyRevit. Use it for laptops that
+  work offline, or with live scripts off.
+
+Which folder is used, first match wins:
+1. your own choice from **Script Folder** (`%APPDATA%\Netbuild\pyRevit\script_source.json`);
+2. the `NETBUILD_SCRIPT_SOURCE` environment variable (several folders separated by `;`) -- for an
+   office-wide setting pushed by IT;
+3. the default shipped in `Netbuild.extension\script_source.json` (`"folders": []` -- none -- as shipped;
+   `%USERPROFILE%`-style variables are expanded).
 
 To update the extension after changing the engine, run `python LevelShifter/sync_pyrevit_lib.py`.
 It copies the shared files into `Netbuild.extension\lib\level_shift`, and the tests fail while the
