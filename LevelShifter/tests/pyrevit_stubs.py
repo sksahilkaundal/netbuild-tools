@@ -141,7 +141,7 @@ class Config(object):
 def install(doc, answers=None):
     """Put stub pyrevit / System modules in sys.modules. Returns a namespace the test inspects."""
     state = types.SimpleNamespace(alerts=[], started=[], config=Config(), saved=0, answers=answers or {},
-                                  picked=None, clipboard=[], switch=[], reloaded=0, printed=[])
+                                  picked=None, clipboard=[], switch=[], reloaded=0, printed=[], lists=[])
 
     def alert(msg, title="", yes=False, no=False, exitscript=False, **kw):
         state.alerts.append((title, msg))
@@ -161,6 +161,9 @@ def install(doc, answers=None):
     forms.ask_for_string = lambda prompt="", title="", **kw: state.answers.get("ask")
     forms.pick_file = lambda **kw: state.picked
     forms.pick_folder = lambda **kw: state.answers.get("folder")
+    forms.SelectFromList = types.SimpleNamespace(       # picks answers["select"], else the first item
+        show=lambda items, title="", button_name="", **kw: state.lists.append((title, list(items))) or
+        state.answers.get("select", list(items)[0]))
     forms.CommandSwitchWindow = types.SimpleNamespace(
         show=lambda options, message="", **kw: state.switch.append((options, message)) or
         state.answers.get("switch"))
