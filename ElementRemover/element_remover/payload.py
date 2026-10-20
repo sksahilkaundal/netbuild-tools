@@ -25,13 +25,20 @@ The new group type keeps the original name when no other instance of the old typ
 type is deleted; several regrouped instances become "<name>", "<name> (2)", ... in Element Id order);
 otherwise it is named "<name> (elements removed)".  Member Element Ids do not change.
 
+Merging identical regrouped types (``merge_groups``): regrouping gives every instance its own type, so
+the regrouped top-level instances of one old type are then switched, one by one, to the type of the
+first (lowest Element Id).  A switch is kept only when every member lands exactly where it was: same
+category, type, workset, phase, Mark, Comments, bounding box, location, facing / hand orientation and
+mirror state (positions within 1 mm).  Any difference (a rotated or mirrored instance, other Marks,
+Revit refusing) rolls that switch back and the instance keeps its own type.  A merged instance's members are new elements (new Element Ids), so their tags go.
+
 What Revit deletes with a target (hosted doors / windows, tags, dimensions, sketches, ...) is found by
 deleting once in a probe transaction that is rolled back, so every deleted element is reported by Id.
 """
 
 CODE = r'''
 import json as _er_json
-from Autodesk.Revit.DB import (BuiltInCategory, Category, CategoryType, ElementId, ElementMulticategoryFilter,
+from Autodesk.Revit.DB import (BuiltInCategory, BuiltInParameter, Category, CategoryType, ElementId, ElementMulticategoryFilter,
                                ElementType, ElementWorksetFilter, FailureProcessingResult, FailureSeverity,
                                FilteredElementCollector, FilteredWorksetCollector, Group, IFailuresPreprocessor,
                                ParameterFilterElement, SelectionFilterElement, Transaction, TransactionGroup,
@@ -299,6 +306,78 @@ def _run_tx(d, name, fn):
     return t.Commit() == TransactionStatus.Committed
 
 
+_TOL = 1.0 / 304.8                       # 1 mm, in feet
+
+
+def _xyz(p):
+    return [p.X, p.Y, p.Z] if p is not None else []
+
+
+def _sig_el(el):
+    """(key, numbers) that place one element: category, type, workset, phase, Mark, Comments, mirror state;
+    bounding box, location, facing / hand orientation."""
+    key = [_iid(el.Category.Id) if el.Category is not None else 0, _iid(el.GetTypeId())]
+    for name in ("WorksetId", "CreatedPhaseId"):
+        try:
+            key.append(_iid(getattr(el, name)))
+        except Exception:
+            key.append(-1)
+    for name in ("ALL_MODEL_MARK", "ALL_MODEL_INSTANCE_COMMENTS"):
+        try:
+            key.append(_txt(el.get_Parameter(getattr(BuiltInParameter, name)).AsString() or ""))
+        except Exception:
+            key.append("")
+    nums = []
+    try:
+        bb = el.get_BoundingBox(None)
+        if bb is not None:
+            nums += _xyz(bb.Min) + _xyz(bb.Max)
+    except Exception:
+        pass
+    loc = getattr(el, "Location", None)
+    try:
+        nums += _xyz(loc.Point)
+    except Exception:
+        try:
+            nums += _xyz(loc.Curve.GetEndPoint(0)) + _xyz(loc.Curve.GetEndPoint(1))
+        except Exception:
+            pass
+    for name in ("FacingOrientation", "HandOrientation"):
+        try:
+            nums += _xyz(getattr(el, name))
+        except Exception:
+            pass
+    for name in ("FacingFlipped", "HandFlipped", "Mirrored"):
+        try:
+            key.append(1 if getattr(el, name) else 0)
+        except Exception:
+            key.append(-1)
+    return tuple(key), nums
+
+
+def _group_sig(d, g):
+    """Every element a group instance holds (nested groups opened), sorted, as _sig_el gives it."""
+    out, todo = [], [g]
+    while todo:
+        for i in todo.pop().GetMemberIds():
+            el = d.GetElement(i)
+            if el is None:
+                continue
+            out.append(_sig_el(el))
+            if isinstance(el, Group):
+                todo.append(el)
+    return sorted(out, key=lambda s: (s[0], [int(round(x / _TOL)) for x in s[1]]))
+
+
+def _same(a, b):
+    if len(a) != len(b):
+        return False
+    for (ka, na), (kb, nb) in zip(a, b):
+        if ka != kb or len(na) != len(nb) or [1 for x, y in zip(na, nb) if abs(x - y) > _TOL]:
+            return False
+    return True
+
+
 def _main():
     d = _pick_doc()
     if _ER["action"] == "sources":
@@ -307,6 +386,7 @@ def _main():
     model_only = bool(_ER.get("model_only", True))
     skip_pinned = bool(_ER.get("skip_pinned", True))
     fix_groups = bool(_ER.get("fix_groups", True))
+    merge_groups = bool(_ER.get("merge_groups", True))
     max_rows = int(_ER.get("max_rows", 20000))
 
     # ---- resolve the targets: worksets and / or filters, then categories
@@ -426,7 +506,7 @@ def _main():
                    "by_source": sorted([k, v] for k, v in sources.items()),
                    "skipped": len(skipped), "skipped_why": sorted([k, v] for k, v in skip_why.items()),
                    "blockers": blockers, "missing": missing, "closed": closed, "modifiable": not d.IsReadOnly,
-                   "fix_groups": fix_groups,
+                   "fix_groups": fix_groups, "merge_groups": merge_groups,
                    "rows": sorted(list(rows.values()) + covered + skipped, key=lambda r: r["id"])[:max_rows]})
     if _ER["action"] == "plan":
         return
@@ -512,6 +592,48 @@ def _main():
                     rec["new_type"] = _name(t)
         return _run_tx(d, "Element Remover: regroup %d group(s)" % len(regrouped), work)
 
+    def merge():
+        """Switch the regrouped top-level instances of each old type to the first one's type, keeping a switch
+        only when every member stays exactly where it was (else it is rolled back). Returns the merges."""
+        done, by_type = [], {}
+        for rec in sorted(regrouped, key=lambda r: r["old"]):
+            g = rec.get("new")
+            if g is not None and _gid(g) <= 0:                  # nested groups stay as they are
+                by_type.setdefault(_iid(rec["type_id"]), []).append(rec)
+        for recs in by_type.values():
+            keeper = recs[0]
+            for rec in recs[1:]:
+                g, old_type = rec["new"], rec["new"].GetTypeId()
+                before, n = _group_sig(d, g), len(_MSGS)
+                t = Transaction(d, "Element Remover: merge group type")
+                opts = t.GetFailureHandlingOptions()
+                opts.SetFailuresPreprocessor(_ErFailures())
+                t.SetFailureHandlingOptions(opts)
+                t.Start()
+                why = None
+                try:
+                    g.GroupType = keeper["new"].GroupType
+                    d.Regenerate()
+                    if not _same(before, _group_sig(d, g)):
+                        why = ("its members would not match (place, orientation, workset, phase, Mark or "
+                               "Comments differ)")
+                    else:
+                        d.Delete(old_type)                      # no instance of it is left
+                except Exception as e:
+                    why = "Revit refused: %s" % _txt(e)[:120]
+                if why is None and t.Commit() != TransactionStatus.Committed:
+                    why = "Revit refused: %s" % "; ".join(m[1] for m in _MSGS[n:] if m[0] == "error")[:160]
+                elif why is not None:
+                    t.RollBack()
+                if why is not None:
+                    del _MSGS[n:]                            # a merge that did not happen is not an error
+                    rec["merge"] = "kept '%s': %s" % (rec.get("new_type", ""), why)
+                    continue
+                rec["merge"] = "merged into '%s'" % keeper.get("new_type", "")
+                rec["new_type"] = keeper.get("new_type", "")
+                done.append(rec)
+        return done
+
     def delete(ids):
         """Delete the targets (unpinning them first when asked); returns every id Revit deleted."""
         for i in ids:
@@ -546,6 +668,7 @@ def _main():
             raise Exception("ER: Revit rolled back the deletion -- %s" % "; ".join(errors_now()))
         if regrouped and not regroup():
             raise Exception("ER: Revit refused to regroup -- %s" % "; ".join(errors_now()))
+        merged = merge() if regrouped and merge_groups else []
 
         gone = set(_iid(x) for x in gone)
         left = []
@@ -567,8 +690,9 @@ def _main():
             deps.append(r)
         for rec in regrouped:
             if rec.get("new") is not None:
-                notes.append("group '%s' (id %d): ungrouped, %d member(s) kept, regrouped as '%s' (id %d)" % (
-                    rec["type_name"], rec["old"], rec["kept"], rec.get("new_type", ""), _iid(rec["new"].Id)))
+                notes.append("group '%s' (id %d): ungrouped, %d member(s) kept, regrouped as '%s' (id %d)%s" % (
+                    rec["type_name"], rec["old"], rec["kept"], rec.get("new_type", ""), _iid(rec["new"].Id),
+                    ("; " + rec["merge"]) if rec.get("merge") else ""))
             else:
                 notes.append("group '%s' (id %d): every member removed -- the instance is gone" % (
                     rec["type_name"], rec["old"]))
@@ -576,7 +700,8 @@ def _main():
         keep = _ER["action"] == "apply" and not errors and not left
         groups = [{"old_id": r["old"], "type": r["type_name"], "kept": r.get("kept", 0),
                    "new_id": _iid(r["new"].Id) if r.get("new") is not None else -1,
-                   "new_type": r.get("new_type", ""), "detail": r["detail"]} for r in regrouped]
+                   "new_type": r.get("new_type", ""), "detail": r["detail"],
+                   "merged": r in merged, "merge": r.get("merge", "")} for r in regrouped]
         if keep:
             tg.Assimilate()
             committed = True

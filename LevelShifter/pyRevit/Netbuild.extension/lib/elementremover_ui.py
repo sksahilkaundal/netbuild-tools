@@ -49,6 +49,8 @@ _WINDOW = '''<Window {ns}
     <WrapPanel DockPanel.Dock="Top" Margin="0,8,0,0">
       <CheckBox x:Name="groups_cb" VerticalAlignment="Center" Margin="0,0,14,0"
                 Content="Elements inside model groups: ungroup, remove, regroup"/>
+      <CheckBox x:Name="merge_cb" VerticalAlignment="Center" Margin="0,0,14,0"
+                Content="Merge identical regrouped group types (their members get new Element Ids)"/>
       <CheckBox x:Name="pinned_cb" VerticalAlignment="Center" Margin="0,0,14,0"
                 Content="Remove pinned elements too (unpins them)"/>
       <CheckBox x:Name="model_cb" VerticalAlignment="Center"

@@ -70,6 +70,7 @@ class ElementRemoverWindow(forms.WPFWindow):
         self.model_tb.Text = doc.Title
         s = options()
         self.groups_cb.IsChecked = s["fix_groups"]
+        self.merge_cb.IsChecked = s["merge_groups"]
         self.pinned_cb.IsChecked = not s["skip_pinned"]
         self.model_cb.IsChecked = s["model_only"]
         self.all_rb.IsChecked = CFG.get_option("combine", "any") == "all"
@@ -146,6 +147,7 @@ class ElementRemoverWindow(forms.WPFWindow):
     # ------------------------------------------------------------ run
     def save_options(self, t):
         CFG.fix_groups = bool(self.groups_cb.IsChecked)
+        CFG.merge_groups = bool(self.merge_cb.IsChecked)
         CFG.skip_pinned = not self.pinned_cb.IsChecked
         CFG.model_only = bool(self.model_cb.IsChecked)
         CFG.combine = t.combine
@@ -158,11 +160,13 @@ class ElementRemoverWindow(forms.WPFWindow):
         """Ask before Apply, with the numbers the plan found."""
         return forms.alert(
             "Remove %d element(s) from %s?\n\n%d standalone, %d inside %d model group instance(s) (ungrouped and "
-            "regrouped without them)%s.\n\nRevit also deletes what is hosted on or depends on them (doors, "
+            "regrouped without them)%s.%s\n\nRevit also deletes what is hosted on or depends on them (doors, "
             "windows, tags, dimensions ...); Check / Trial run list them.\nOne Undo entry in Revit." % (
                 plan["targets"], self.doc.Title, plan["standalone"], plan["in_groups"], plan["groups"],
                 (", plus %d inside group instances removed as a whole" % plan["with_group"])
-                if plan["with_group"] else ""),
+                if plan["with_group"] else "",
+                ("\nIdentical regrouped instances will share one group type again; their members get new Element "
+                 "Ids, so tags on them go.") if plan["in_groups"] and self.merge_cb.IsChecked else ""),
             title="Apply", yes=True, no=True)
 
     def run(self, action):

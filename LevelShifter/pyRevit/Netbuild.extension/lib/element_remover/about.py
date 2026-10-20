@@ -28,6 +28,7 @@ FEATURES = [
     "Targets: worksets, rule-based view filters and saved selection filters -- either or both, by category",
     "Check (plan only) -> Trial run (rolled back) -> Apply (one Undo entry: 'Element Remover by Netbuild')",
     "Elements inside model groups (nested too): ungrouped, removed, regrouped; group type names kept",
+    "Identical regrouped instances share one group type again, checked member by member (option)",
     "Pinned elements, levels, grids, links and views are never removed unless asked (pinned) / at all",
     "Every element deleted is listed by Id, including the hosted / dependent ones Revit deletes with it",
 ]

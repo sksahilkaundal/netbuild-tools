@@ -49,7 +49,7 @@ copies differ.
 | **Filters** | Rule-based view filters (`rules on Walls, Doors`) and saved selection filters (`saved selection, 12 elements`). Ctrl+Click picks several |
 | **OR / AND** | With both worksets and filters picked: remove what is on a workset **or** passes a filter (the default), or only what is on a workset **and** passes a filter |
 | **Only categories** | Blank = every category. Type `Walls, Doors`, click **Walls only**, or **Pick…** from the categories in use |
-| **Options** | *Elements inside model groups: ungroup, remove, regroup* (on) · *Remove pinned elements too* (off) · *Model elements only* (on) |
+| **Options** | *Elements inside model groups: ungroup, remove, regroup* (on) · *Merge identical regrouped group types* (on) · *Remove pinned elements too* (off) · *Model elements only* (on) |
 
 ### Steps
 
@@ -108,8 +108,26 @@ The new group type is named as follows:
   original type.
 
 Element Ids of the kept members **do not change**, so their tags and schedules stay. Attached detail groups
-have to be re-attached; Trial / Apply say when that applies. Every regrouped instance gets its own group
-type. If several instances end up identical, you can swap them to one type afterwards in Revit.
+have to be re-attached; Trial / Apply say when that applies.
+
+#### Merging identical regrouped group types
+
+Regrouping gives every instance its own group type: `Toilet Core`, `Toilet Core (2)`, … So, by default,
+the regrouped instances of one old type are then switched to the type of the first one (the lowest Element
+Id), one at a time. Each switch is **checked member by member**, and is kept only when every member ends up
+exactly as it was:
+- the same category, type, workset, phase, **Mark** and **Comments**;
+- the same bounding box, location, facing / hand orientation and mirror state (positions within 1 mm).
+
+If anything differs, that switch is rolled back and the instance keeps its own type. Trial / Apply list why.
+This happens, for example, with:
+- a **rotated or mirrored** instance;
+- members with **different Marks**;
+- a group **nested** in another group, which is never switched.
+
+A merged instance's members are rebuilt by Revit from the shared type, so they get **new Element Ids**, and
+tags on them are removed. Re-tag them if they were tagged. Untick *Merge identical regrouped group types*
+(or use `--no-merge`) to keep one type per instance and keep every Element Id.
 
 A whole **group instance** can be a target too. For example, a group on the *Demolition* workset is
 deleted with all its members, and nothing is ungrouped.
@@ -143,6 +161,7 @@ ElementRemover apply --filter "To Remove"                       :: do it, keep i
 ElementRemover apply --workset "Demolition" --filter "All Walls" --both   :: on the workset AND passing the filter
 ElementRemover apply --workset "Demolition" --include-pinned    :: pinned elements too (unpinned first)
 ElementRemover apply --workset "Demolition" --no-groups         :: leave group members alone
+ElementRemover apply --filter "To Remove" --no-merge            :: one group type per regrouped instance
 ElementRemover --model B003-Studio-ARC sources                     :: bind to a model by title
 ElementRemover setup --set skip_pinned=false                    :: settings
 ElementRemover about                                            :: product info, requirements
@@ -157,6 +176,7 @@ ElementRemover license                                          :: the licence: 
 |---|---|---|
 | `skip_pinned` | true | Pinned targets (and targets inside pinned groups) are listed, not removed |
 | `fix_groups` | true | Targets inside model groups: ungroup, remove, regroup |
+| `merge_groups` | true | Regrouped instances that are identical, member by member, share one group type again (their members get new Element Ids) |
 | `model_only` | true | Annotation and view-specific elements are never removed |
 | `max_rows` | 20000 | Element rows returned and written to the CSV |
 | `apply_timeout_seconds` | 3600 | Trial and Apply on a large model can take minutes (command line) |
@@ -190,6 +210,7 @@ The tests cover:
 - workset, filter, AND/OR and category targeting;
 - trial leaving the model unchanged;
 - standalone, grouped, nested and whole-group removal, and the type names after regrouping;
+- merging identical regrouped types, and refusing it for a mirrored instance or different Marks;
 - pinned elements and groups, borrowed elements, names not found, Revit warnings and errors;
 - the CLI, the listener route and the window.
 

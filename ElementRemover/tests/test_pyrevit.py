@@ -76,7 +76,7 @@ class ExtensionFileTests(unittest.TestCase):
         win = ET.fromstring(elementremover_ui.window_xaml())
         names = [e.get(pyrevit_stubs.X_NAME) for e in win.iter() if e.get(pyrevit_stubs.X_NAME)]
         self.assertEqual(len(names), len(set(names)))
-        for want in ("ws_lb", "flt_lb", "cat_tb", "any_rb", "all_rb", "groups_cb", "pinned_cb", "model_cb",
+        for want in ("ws_lb", "flt_lb", "cat_tb", "any_rb", "all_rb", "groups_cb", "merge_cb", "pinned_cb", "model_cb",
                      "check_btn", "trial_btn", "apply_btn", "about_btn", "licence_btn", "report_lb"):
             self.assertIn(want, names)
         lb = [e for e in win.iter() if e.get(pyrevit_stubs.X_NAME) == "ws_lb"][0]
@@ -148,8 +148,8 @@ class ButtonTests(unittest.TestCase):
         self.assertEqual(win.flt_lb.Items, ["All Walls   (rules on Walls)", "Pick list   (saved selection, 4 elements)",
                                             "To Remove   (rules on Doors, Plumbing Fixtures, Walls)"])
         self.assertIn("closed: Site", win.info_tb.Text)
-        self.assertEqual((win.groups_cb.IsChecked, win.pinned_cb.IsChecked, win.model_cb.IsChecked,
-                          win.any_rb.IsChecked), (True, False, True, True))
+        self.assertEqual((win.groups_cb.IsChecked, win.merge_cb.IsChecked, win.pinned_cb.IsChecked,
+                          win.model_cb.IsChecked, win.any_rb.IsChecked), (True, True, False, True, True))
         win.check_btn.click()                                           # nothing picked
         self.assertIn("[FAIL] Targets -- pick at least one workset or filter", self.report(win))
         win.walls_btn.click()
@@ -193,6 +193,7 @@ class ButtonTests(unittest.TestCase):
         self.pick(win.flt_lb, "To Remove")
         win.apply_btn.click()
         self.assertIn("Remove 5 element(s)", st.alerts[-1][1])
+        self.assertIn("share one group type again", st.alerts[-1][1])   # the merge is announced
         self.assertTrue(self.doc.snapshot() == self.snap0)              # "No" -> nothing changed
         self.doc.owners[self.el["wall remove"].Id.Value] = "jane.d"
         win.apply_btn.click()                                           # blocked: no confirmation asked
@@ -209,6 +210,15 @@ class ButtonTests(unittest.TestCase):
         win.apply_btn.click()
         self.assertEqual(self.gone("demo wall 1", "demo wall 2", "store wall 3", "demo slab"),
                          ["demo wall 1", "demo wall 2"])                # AND walls; group members left alone
+
+    def test_merge_checkbox(self):
+        st, win = self.open_window()
+        self.pick(win.flt_lb, "To Remove")
+        win.merge_cb.IsChecked = False
+        win.apply_btn.click()
+        self.assertNotIn("share one group type again", st.alerts[-1][1])
+        self.assertIs(st.config.values["merge_groups"], False)
+        self.assertIn("Toilet Core (2)", self.doc.type_names())         # one type per regrouped instance
 
     def check_about(self, win):
         self.assertEqual(win.Title, "About Element Remover by Netbuild")

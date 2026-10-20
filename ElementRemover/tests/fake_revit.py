@@ -6,6 +6,11 @@ with Revit's behaviour where it matters:
 
 * worksets (one closed: its elements are not loaded, so collectors do not return them), rule-based
   view filters (categories + a rule on Comments) and saved selection filters;
+* geometry, enough to tell whether an element moved: a position (bounding box from it, location point)
+  and a mirror state (facing orientation, Mirrored); a family type id per type name;
+* switching a group instance's type (Group.GroupType = t) rebuilds its members as new elements from the
+  type's definition, placed relative to the instance's origin (the lowest member position) -- so a
+  mirrored or differently laid-out instance comes out different, as in Revit;
 * model groups: a member cannot be deleted while it is grouped (Revit keeps the instances of a type
   identical), a pinned group cannot be ungrouped, group types need unique names, a type still in
   use cannot be deleted, nested groups;
@@ -51,6 +56,23 @@ class WorksetId(object):
 
     def __hash__(self):
         return hash(self.IntegerValue)
+
+
+class XYZ(object):
+    def __init__(self, x, y, z):
+        self.X, self.Y, self.Z = x, y, z
+
+
+class _Names(object):
+    """BuiltInParameter: every name exists and is its own key."""
+
+    def __getattr__(self, name):
+        if name.startswith("__"):
+            raise AttributeError(name)
+        return name
+
+
+BuiltInParameter = _Names()
 
 
 class _Categories(object):
@@ -109,7 +131,26 @@ class Element(object):
         self._pinned = False
         self.ViewSpecific = view_specific
         self.IsValidObject = True
+        self.pos = (0.0, 0.0, 0.0)          # feet
+        self.mirrored = False
+        self.mark = ""
         doc.add(self)
+
+    def get_Parameter(self, bip):
+        value = {"ALL_MODEL_MARK": self.mark, "ALL_MODEL_INSTANCE_COMMENTS": self.comments}.get(bip)
+        return types.SimpleNamespace(AsString=lambda: value) if value is not None else None
+
+    def place(self, x, y=0.0, z=0.0, mirrored=False):
+        self.pos, self.mirrored = (float(x), float(y), float(z)), mirrored
+        return self
+
+    def get_BoundingBox(self, view):
+        x, y, z = self.pos
+        return types.SimpleNamespace(Min=XYZ(x, y, z), Max=XYZ(x + 1.0, y + 1.0, z + 3.0))
+
+    @property
+    def Location(self):
+        return types.SimpleNamespace(Point=XYZ(*self.pos))
 
     @property
     def Pinned(self):
@@ -121,7 +162,7 @@ class Element(object):
         self._pinned = bool(value)
 
     def GetTypeId(self):
-        return INVALID
+        return self.doc.family_type(self.Name) if self.Category is not None else INVALID
 
 
 class ElementType(Element):
@@ -141,6 +182,14 @@ class FamilyInstance(Element):
         super().__init__(doc, cat, name, ws, comments)
         self.Host = host
         self.SuperComponent = None
+
+    @property
+    def FacingOrientation(self):
+        return XYZ(-1.0 if self.mirrored else 1.0, 0.0, 0.0)
+
+    @property
+    def Mirrored(self):
+        return self.mirrored
 
 
 class Tag(Element):
@@ -191,6 +240,14 @@ class Group(Element):
     @property
     def GroupType(self):
         return self.doc.by_id[self.type_id.Value]
+
+    @GroupType.setter
+    def GroupType(self, gtype):
+        self.doc.swap_group_type(self, gtype)
+
+    def origin(self):
+        ps = [m.pos for m in self.member_els()]
+        return tuple(min(p[k] for p in ps) for k in range(3)) if ps else self.pos
 
     def GetMemberIds(self):
         return list(self.members)
@@ -407,7 +464,7 @@ class WorksharingUtils(object):
 
 def install_stubs():
     db = types.ModuleType("Autodesk.Revit.DB")
-    for name in ("BuiltInCategory", "Category", "CategoryType", "ElementId", "ElementMulticategoryFilter",
+    for name in ("BuiltInCategory", "BuiltInParameter", "Category", "CategoryType", "ElementId", "ElementMulticategoryFilter",
                  "ElementType", "ElementWorksetFilter", "FailureProcessingResult", "FailureSeverity", "Group",
                  "IFailuresPreprocessor", "ParameterFilterElement", "SelectionFilterElement", "Transaction",
                  "TransactionGroup", "TransactionStatus", "View", "WorksetKind", "WorksharingUtils",
@@ -445,6 +502,7 @@ class Doc(object):
         self.log, self.groups = [], []
         self.Create = types.SimpleNamespace(NewGroup=self.new_group)
         self.Settings = types.SimpleNamespace(Categories=self)   # iterating it yields the categories
+        self._ftypes = {}
         app.Documents.append(self)
 
     def __iter__(self):
@@ -534,6 +592,46 @@ class Doc(object):
             self.remove(el)
         return [el.Id for el in order]
 
+    def family_type(self, name):
+        """One type id per type name (an id no element has)."""
+        if name not in self._ftypes:
+            self._ftypes[name] = ElementId(9000000 + len(self._ftypes))
+        return self._ftypes[name]
+
+    def Regenerate(self):
+        pass
+
+    def swap_group_type(self, g, gtype):
+        """Revit rebuilds the instance's members from the new type's definition (here: another instance of it),
+        as new elements placed relative to the instance's origin."""
+        ref = [x for x in self.by_id.values() if isinstance(x, Group) and x is not g and x.type_id == gtype.Id]
+        if not ref:
+            raise Exception("no definition for group type '%s'" % gtype.Name)
+        ref = ref[0]
+        o_ref, o_g = ref.origin(), g.origin()
+        self.touch(g)
+        copies, new_of = [], {}
+        for m in ref.member_els():
+            if isinstance(m, Group):
+                raise Exception("the stand-in does not copy nested groups")
+            c = type(m)(self, m.Category and [k for k, v in self._cats.items() if v is m.Category][0], m.Name,
+                        m.WorksetId.IntegerValue, m.comments)
+            c.place(*[m.pos[k] - o_ref[k] + o_g[k] for k in range(3)], mirrored=m.mirrored)
+            c.mark = m.mark                         # instance data comes from the type's definition
+            new_of[m.Id.Value] = c
+            copies.append(c)
+            self.touch(c)
+        for m, c in zip(ref.member_els(), copies):
+            if getattr(m, "Host", None) is not None and m.Host.Id.Value in new_of:
+                c.Host = new_of[m.Host.Id.Value]
+        for m in g.member_els():
+            self.touch(m)
+            self.remove(m)
+        g.members = [c.Id for c in copies]
+        for c in copies:
+            c.GroupId = g.Id
+        g.type_id = gtype.Id
+
     def new_group(self, ids):
         members = [self.by_id[i.Value] for i in ids]
         for m in members:
@@ -592,27 +690,28 @@ class FakeRevit(object):
 
         # group type 'Toilet Core' placed twice: partition, door marked REMOVE (hosted on it), WC
         core_t = e["Toilet Core"] = GroupType(d, "Toilet Core")
-        for k in ("1", "2"):
-            p = e["core wall " + k] = Element(d, "OST_Walls", "Partition 100", ARC)
-            dr = e["core door " + k] = FamilyInstance(d, "OST_Doors", "Single Flush 800x2100", ARC, "REMOVE", host=p)
-            wc = e["core wc " + k] = FamilyInstance(d, "OST_PlumbingFixtures", "WC", INT)
+        for k, x in (("1", 0.0), ("2", 40.0)):
+            p = e["core wall " + k] = Element(d, "OST_Walls", "Partition 100", ARC).place(x)
+            dr = e["core door " + k] = FamilyInstance(d, "OST_Doors", "Single Flush 800x2100", ARC, "REMOVE",
+                                                      host=p).place(x + 2)
+            wc = e["core wc " + k] = FamilyInstance(d, "OST_PlumbingFixtures", "WC", INT).place(x + 5, 3)
             e["core " + k] = Group(d, core_t, [p, dr, wc], ARC)
         # group type 'Store' placed twice; only G3's wall is on Demolition
         store_t = e["Store"] = GroupType(d, "Store")
-        e["store wall 3"] = Element(d, "OST_Walls", "Store partition", DEMO)
-        e["store shelf 3"] = FamilyInstance(d, "OST_Furniture", "Shelf", INT)
+        e["store wall 3"] = Element(d, "OST_Walls", "Store partition", DEMO).place(100)
+        e["store shelf 3"] = FamilyInstance(d, "OST_Furniture", "Shelf", INT).place(102, 4)
         e["store 3"] = Group(d, store_t, [e["store wall 3"], e["store shelf 3"]], ARC)
-        e["store wall 4"] = Element(d, "OST_Walls", "Store partition", ARC)
-        e["store shelf 4"] = FamilyInstance(d, "OST_Furniture", "Shelf", INT)
+        e["store wall 4"] = Element(d, "OST_Walls", "Store partition", ARC).place(130)
+        e["store shelf 4"] = FamilyInstance(d, "OST_Furniture", "Shelf", INT).place(132, 4)
         e["store 4"] = Group(d, store_t, [e["store wall 4"], e["store shelf 4"]], ARC)
         # 'Apartment' holds a nested 'Bath Pod'; a second 'Bath Pod' stands alone. Each pod's basin is REMOVE
         pod_t = e["Bath Pod"] = GroupType(d, "Bath Pod")
-        for k in ("6", "7"):
-            b1 = e["basin " + k] = FamilyInstance(d, "OST_PlumbingFixtures", "Basin", INT, "REMOVE")
-            b2 = e["bath " + k] = FamilyInstance(d, "OST_PlumbingFixtures", "Bath", INT)
+        for k, x in (("6", 200.0), ("7", 260.0)):
+            b1 = e["basin " + k] = FamilyInstance(d, "OST_PlumbingFixtures", "Basin", INT, "REMOVE").place(x)
+            b2 = e["bath " + k] = FamilyInstance(d, "OST_PlumbingFixtures", "Bath", INT).place(x + 3)
             e["pod " + k] = Group(d, pod_t, [b1, b2], ARC)
         apt_t = e["Apartment"] = GroupType(d, "Apartment")
-        e["apt wall"] = Element(d, "OST_Walls", "Apartment Wall 150", ARC)
+        e["apt wall"] = Element(d, "OST_Walls", "Apartment Wall 150", ARC).place(195)
         e["apt 5"] = Group(d, apt_t, [e["apt wall"], e["pod 6"]], ARC)
 
         # filters

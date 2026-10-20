@@ -130,6 +130,11 @@ class Fixture(unittest.TestCase):
         g = self.doc.group_of(self.el[key])
         return g.GroupType.Name, sorted(m.Name for m in g.member_els())
 
+    def instances(self, type_name):
+        """The group instances of a type, as {instance id: sorted [(member name, position, mirrored)]}."""
+        return dict((g.Id.Value, sorted((m.Name, m.pos, m.mirrored) for m in g.member_els()))
+                    for g in self.doc.by_id.values() if isinstance(g, Group) and g.GroupType.Name == type_name)
+
     def status(self, out, key):
         return [r["status"] for r in out["RESULT"]["rows"] if r["id"] == self.el[key].Id.Value][0]
 
@@ -220,9 +225,13 @@ class WorksetTests(Fixture):
                                    "store wall 3", "store wall 4"),
                          ["wall keep", "wall remove", "core wall 1", "core wall 2", "apt wall", "store wall 3",
                           "store wall 4"])
-        self.assertEqual(self.gone("core door 1", "core wc 1", "store shelf 4"), ["core door 1"])  # door was hosted
-        self.assertEqual(self.grouped_with("core wc 1")[1], ["WC"])
-        self.assertEqual(self.grouped_with("store shelf 4"), ("Store (2)", ["Shelf"]))
+        self.assertEqual(self.gone("core door 1", "core wc 1", "store shelf 3"), ["core door 1"])  # door was hosted
+        self.assertEqual(self.grouped_with("core wc 1"), ("Toilet Core", ["WC"]))
+        # both Store instances lost their wall and are alike: they share one type again
+        self.assertEqual(self.grouped_with("store shelf 3"), ("Store", ["Shelf"]))
+        self.assertEqual(sorted(self.instances("Store").values()),
+                         [[("Shelf", (102.0, 4.0, 0.0), False)], [("Shelf", (132.0, 4.0, 0.0), False)]])
+        self.assertNotIn("Store (2)", self.doc.type_names())
 
 
 class FilterTests(Fixture):
@@ -233,10 +242,16 @@ class FilterTests(Fixture):
         self.assertEqual(self.gone("wall remove", "core door 1", "core door 2", "basin 6", "basin 7"),
                          ["wall remove", "core door 1", "core door 2", "basin 6", "basin 7"])
         # no instance of the old types is left: the new types keep the names (old types deleted)
-        self.assertEqual(self.doc.type_names(), ["Apartment", "Bath Pod", "Bath Pod (2)", "Store", "Toilet Core",
-                                                 "Toilet Core (2)"])
-        self.assertEqual(self.grouped_with("core wall 1")[1], ["Partition 100", "WC"])
-        self.assertEqual(self.grouped_with("core wall 2")[1], ["Partition 100", "WC"])
+        # no instance of the old types is left: the new types keep the names (old types deleted). The two
+        # Toilet Cores are alike again and share one type; a nested Bath Pod is never switched
+        self.assertEqual(self.doc.type_names(), ["Apartment", "Bath Pod", "Bath Pod (2)", "Store", "Toilet Core"])
+        self.assertEqual(self.grouped_with("core wall 1"), ("Toilet Core", ["Partition 100", "WC"]))
+        self.assertEqual(sorted(self.instances("Toilet Core").values()), [
+            [("Partition 100", (0.0, 0.0, 0.0), False), ("WC", (5.0, 3.0, 0.0), False)],
+            [("Partition 100", (40.0, 0.0, 0.0), False), ("WC", (45.0, 3.0, 0.0), False)]])   # nothing moved
+        self.assertEqual(self.gone("core wall 2", "core wc 2"), ["core wall 2", "core wc 2"])  # rebuilt: new ids
+        self.assertEqual([g["merged"] for g in sorted(r["groups"], key=lambda g: g["old_id"])],
+                         [False, True, False, False, False])
         # the nested Bath Pod is regrouped first, then the Apartment around it
         pod = self.doc.group_of(self.el["bath 6"])
         self.assertEqual(sorted(m.Name for m in pod.member_els()), ["Bath"])
@@ -245,6 +260,59 @@ class FilterTests(Fixture):
         self.assertEqual(sorted(m.Name for m in apt.member_els()), ["Apartment Wall 150", "Bath Pod"])
         self.assertEqual(len(r["groups"]), 5)
         self.assertEqual(self.gone("core wall 1", "bath 6", "apt wall", "wall keep"), [])
+
+    def test_merge_checks_every_member(self):
+        before = self.instances("Toilet Core")
+        out = self.run_("trial", filters=["To Remove"])                 # the merge is rolled back with the rest
+        self.assertEqual(len([g for g in out["RESULT"]["groups"] if g["merged"]]), 1)
+        self.assertTrue(self.unchanged())
+        # a mirrored instance: switching it to the other one's type would mirror its members -> not merged
+        for k in ("core wall 2", "core door 2", "core wc 2"):
+            self.el[k].mirrored = True
+        out = self.run_("apply", filters=["To Remove"])
+        r = out["RESULT"]
+        self.assertTrue(r["committed"], r)
+        self.assertEqual(r["errors"], [])                                # a refused merge is not an error
+        self.assertIn("Toilet Core (2)", self.doc.type_names())
+        self.assertEqual(self.gone("core wall 2", "core wc 2"), [])      # its members kept their Element Ids
+        self.assertEqual([m[2] for m in self.instances("Toilet Core (2)").popitem()[1]], [True, True])
+        kept = [g for g in r["groups"] if g["merge"].startswith("kept")]
+        self.assertEqual(len(kept), 1)
+        self.assertIn("would not match", kept[0]["merge"])
+        checks, lines = core.result_checks("apply", r)
+        self.assertIn("Group types not merged", [c.label for c in checks])
+        self.assertNotIn("Group types merged", [c.label for c in checks])
+        self.assertTrue([l for l in lines if "kept 'Toilet Core (2)'" in l], lines)
+        self.assertTrue(len(before) == 2 and [x for x in before.values() if len(x) == 3])
+
+    def test_merge_keeps_member_data(self):
+        """Marks differ between the instances: a merge would copy one's Marks onto the other -> not merged."""
+        self.el["core wc 1"].mark, self.el["core wc 2"].mark = "WC-101", "WC-201"
+        out = self.run_("apply", filters=["To Remove"])
+        self.assertTrue(out["RESULT"]["committed"])
+        self.assertIn("Toilet Core (2)", self.doc.type_names())
+        self.assertEqual((self.el["core wc 2"].mark, self.gone("core wc 2")), ("WC-201", []))
+        self.assertIn("would not match", [g for g in out["RESULT"]["groups"] if g["merge"]][0]["merge"])
+
+    def test_merge_option_off(self):
+        plan, _ = core.plan_checks(self.run_("plan", filters=["To Remove"], merge_groups=False)["PLAN"])
+        self.assertNotIn("share one group type", str([c for c in plan if c.label == "Model groups"][0]))
+        out = self.run_("apply", filters=["To Remove"], merge_groups=False)
+        self.assertTrue(out["RESULT"]["committed"])
+        self.assertEqual(self.doc.type_names(), ["Apartment", "Bath Pod", "Bath Pod (2)", "Store", "Toilet Core",
+                                                 "Toilet Core (2)"])
+        self.assertEqual(self.gone("core wall 2", "core wc 2"), [])      # Element Ids kept
+        self.assertEqual([g["merge"] for g in out["RESULT"]["groups"]], [""] * 5)
+
+    def test_merged_report(self):
+        plan, _ = core.plan_checks(self.run_("plan", filters=["To Remove"])["PLAN"])
+        self.assertIn("share one group type again", str([c for c in plan if c.label == "Model groups"][0]))
+        out = self.run_("apply", filters=["To Remove"])
+        checks, lines = core.result_checks("apply", out["RESULT"])
+        merged = [c for c in checks if c.label == "Group types merged"][0]
+        self.assertIn("1 regrouped instance(s) now share the type", str(merged))
+        self.assertIn("new Element Ids", str(merged))
+        self.assertTrue([l for l in lines if "merged into 'Toilet Core'" in l], lines)
 
     def test_workset_and_filter(self):
         out = self.run_("plan", ["Demolition"], ["All Walls"], t={"combine": "all"})
@@ -425,6 +493,9 @@ class ListenerTests(Fixture):
         rc, out = self.cli("apply", "--workset", "Demolition", "--filter", "All Walls", "--both", "--no-groups")
         self.assertEqual(rc, 0, out)
         self.assertEqual(self.gone("demo wall 1", "demo wall 2", "store wall 3"), ["demo wall 1", "demo wall 2"])
+        rc, out = self.cli("apply", "--filter", "To Remove", "--no-merge")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("Toilet Core (2)", self.doc.type_names())
         rc, out = self.cli("apply", "--workset", "Demolition", "--include-pinned")
         self.assertEqual(rc, 0, out)
         self.assertEqual(self.gone("demo slab", "store wall 3"), ["demo slab", "store wall 3"])
