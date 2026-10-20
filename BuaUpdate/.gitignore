@@ -1,0 +1,9 @@
+settings.json
+last_run.json
+logs/
+build/
+dist/
+*.spec
+__pycache__/
+version_*.txt
+Backup/
