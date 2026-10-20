@@ -332,10 +332,11 @@ class ButtonTests(unittest.TestCase):
         self.assertEqual(lic.license_tb.Text, about.LICENSE_TEXT)
 
     def test_ribbon_about_lists_every_product(self):
-        st = pyrevit_stubs.install(self.m.doc, {"select": "Stair Path by Netbuild"})
+        st = pyrevit_stubs.install(self.m.doc, {"pick": "Stair Path by Netbuild"})
         runpy.run_path(os.path.join(EXT, "Netbuild.tab", "About.panel", "About.pushbutton", "script.py"),
                        run_name="__main__")
-        self.assertEqual(st.lists[-1][1], ["Level Shift by Netbuild", "Stair Path by Netbuild"])
+        self.assertEqual(st.lists[-1][1], ["Level Shift by Netbuild", "BUA Update by Netbuild",
+                                            "Stair Path by Netbuild"])
         self.assertEqual(pyrevit_stubs.WPFWindow.shown[-1].product_tb.Text, "Stair Path by Netbuild")
 
 

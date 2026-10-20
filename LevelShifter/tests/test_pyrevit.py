@@ -45,8 +45,10 @@ IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DI
                                                                        FOLDER, UPDATE, STAIR_PATH] +
                     [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py",
                                                             "netbuild_about.py", "netbuild_scripts.py",
-                                                            "netbuild_roundtrip.py", "stair_path_ui.py",
-                                                            os.path.join("stair_path", "__init__.py"),
+                                                            "netbuild_roundtrip.py", "buaupdate_app.py",
+                                                            os.path.join("bua_update", "__init__.py"),
+                                                            os.path.join("bua_update", "about.py"),
+                                                            "stair_path_ui.py", os.path.join("stair_path", "__init__.py"),
                                                             os.path.join("stair_path", "about.py"),
                                                             os.path.join("stair_path", "rules.py"),
                                                             os.path.join("stair_path", "engine.py"))])
@@ -115,7 +117,8 @@ class ExtensionFileTests(unittest.TestCase):
             self.assertIn("netbuild_scripts.run_live(globals())", src, script_path)
         self.assertGreater(len(BUTTON_SCRIPTS), 20)
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
-            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Stairs", "-", "Scripts", "-", "About"])
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Areas", "-", "Stairs", "-",
+                                                "Scripts", "-", "About"])
         with open(os.path.join(EXT, "Netbuild.tab", "About.panel", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "About", "-", "Licence"])
 
@@ -289,6 +292,7 @@ class ButtonTests(unittest.TestCase):
     def test_about_button(self):
         st = pyrevit_stubs.install(self.doc)
         runpy.run_path(ABOUT, run_name="__main__")
+        self.assertEqual(st.lists[-1][1][0], "Level Shift by Netbuild")      # every Netbuild product is listed
         win = pyrevit_stubs.WPFWindow.shown[-1]
         self.check_about(win)
         win.copy_btn.click()
