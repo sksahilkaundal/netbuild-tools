@@ -4,9 +4,9 @@ Copyright (c) 2026 Netbuild. All rights reserved.
 Website: https://skaec.com
 
 This agreement covers every Netbuild software product -- including Level Shift by
-Netbuild, Plot Runner by Netbuild, Revit MCP Router by Netbuild, Remote Router by
-Netbuild and Revit Status by Netbuild -- together with its updates and documentation
-(the "Software").
+Netbuild, Model Prep by Netbuild, Plot Runner by Netbuild, Revit MCP Router by
+Netbuild, Remote Router by Netbuild and Revit Status by Netbuild -- together with
+its updates and documentation (the "Software").
 
 1. Ownership. The Software is proprietary. It is owned by Netbuild and protected by
    copyright and other intellectual property laws. It is licensed, not sold.
