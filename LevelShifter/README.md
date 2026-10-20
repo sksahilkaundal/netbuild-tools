@@ -28,8 +28,10 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
 3. Register that folder with pyRevit, then **Reload**. You can do this in either of two ways:
    - **pyRevit → Settings → Custom Extension Directories**;
    - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
-4. A **Netbuild** tab appears with three panels:
+4. A **Netbuild** tab appears with four panels:
    - **Levels**, holding **Level Shift** and **Level Shift App**;
+   - **Models**, holding **Model Prep** and **Place Links** (*Model Prep by Netbuild*, see
+     [`ModelPrep.md`](pyRevit/ModelPrep.md));
    - **Scripts**, holding **Script Folder** and **Update Scripts** (see *Script folder* below);
    - **About**, holding **About** (product info, version, requirements) and **Licence** (the licensing page).
 
@@ -281,6 +283,8 @@ The tests cover:
 - shape-change rollback;
 - paused, unreachable or stale Revit replies;
 - the CLI and the window.
+
+`test_model_prep.py` covers Model Prep by Netbuild against its own stand-in model (`tests\fake_links.py`).
 
 ## About
 
