@@ -44,6 +44,7 @@ class Control(object):
         d["_checked"] = el.get("IsChecked") == "True"
         d["_selected"] = None
         d["Items"] = Items()
+        d["SelectedItems"] = Items()        # a ListBox with SelectionMode="Extended"
         for name in ("Click", "TextChanged", "SelectionChanged", "Checked"):
             d[name] = Event()
 
@@ -141,7 +142,7 @@ class Config(object):
 def install(doc, answers=None):
     """Put stub pyrevit / System modules in sys.modules. Returns a namespace the test inspects."""
     state = types.SimpleNamespace(alerts=[], started=[], config=Config(), saved=0, answers=answers or {},
-                                  picked=None, clipboard=[], switch=[], reloaded=0, printed=[])
+                                  picked=None, clipboard=[], switch=[], reloaded=0, printed=[], picks=[])
 
     def alert(msg, title="", yes=False, no=False, exitscript=False, **kw):
         state.alerts.append((title, msg))
@@ -161,6 +162,8 @@ def install(doc, answers=None):
     forms.ask_for_string = lambda prompt="", title="", **kw: state.answers.get("ask")
     forms.pick_file = lambda **kw: state.picked
     forms.pick_folder = lambda **kw: state.answers.get("folder")
+    forms.SelectFromList = types.SimpleNamespace(
+        show=lambda items, **kw: state.picks.append(list(items)) or state.answers.get("pick"))
     forms.CommandSwitchWindow = types.SimpleNamespace(
         show=lambda options, message="", **kw: state.switch.append((options, message)) or
         state.answers.get("switch"))
