@@ -31,6 +31,7 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
 4. A **Netbuild** tab appears with these panels:
    - **Levels**, holding **Level Shift** and **Level Shift App**;
    - **Areas**, holding **BUA Update** (opens BUA Update by Netbuild, see [`BuaUpdate/`](../BuaUpdate/README.md));
+   - **Sheets**, holding **Align Viewports** (see [`AlignViewports/`](../AlignViewports/README.md));
    - **Stairs**, holding **Stair Path** (Stair Path by Netbuild -- see [`StairPath/README.md`](../StairPath/README.md));
    - **Warnings**, holding **Warnings Summary** and **Clear Warnings** (*Clear Warnings by Netbuild*, below);
    - **Cleanup**, holding **Element Remover** (see [`ElementRemover/`](../ElementRemover/README.md));
