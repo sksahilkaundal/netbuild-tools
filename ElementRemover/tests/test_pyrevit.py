@@ -98,8 +98,8 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertIn('__author__ = "Netbuild -- skaec.com"\n\nimport netbuild_scripts\n'
                       'netbuild_scripts.run_live(globals())', src)          # runs from the script folder when set
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
-            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Areas", "-", "Warnings", "-",
-                                                "Cleanup", "-", "Scripts", "-", "About"])             # About last
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Areas", "-", "Stairs", "-",
+                                                "Warnings", "-", "Cleanup", "-", "Scripts", "-", "About"])  # About last
 
 
 class ButtonTests(unittest.TestCase):

@@ -1,6 +1,7 @@
 layout:
   - Levels
   - Areas
+  - Stairs
   - Warnings
   - Cleanup
   - Scripts
