@@ -1,5 +1,9 @@
 layout:
   - Levels
   - Models
+  - Areas
+  - Sheets
+  - Stairs
+  - Warnings
   - Scripts
   - About

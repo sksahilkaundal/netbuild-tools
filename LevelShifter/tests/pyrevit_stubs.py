@@ -44,6 +44,7 @@ class Control(object):
         d["_checked"] = el.get("IsChecked") == "True"
         d["_selected"] = None
         d["Items"] = Items()
+        d["SelectedItems"] = Items()        # a ListBox with SelectionMode="Extended"
         for name in ("Click", "TextChanged", "SelectionChanged", "Checked", "Unchecked"):
             d[name] = Event()
 
@@ -143,7 +144,7 @@ class Config(object):
 def install(doc, answers=None):
     """Put stub pyrevit / System modules in sys.modules. Returns a namespace the test inspects."""
     state = types.SimpleNamespace(alerts=[], started=[], config=Config(), saved=0, answers=answers or {},
-                                  picked=None, clipboard=[], switch=[], reloaded=0, printed=[], lists=[])
+                                  picked=None, clipboard=[], lists=[], switch=[], reloaded=0, printed=[])
 
     def alert(msg, title="", yes=False, no=False, exitscript=False, **kw):
         state.alerts.append((title, msg))
@@ -163,12 +164,18 @@ def install(doc, answers=None):
     forms.ask_for_string = lambda prompt="", title="", **kw: state.answers.get("ask")
     forms.pick_file = lambda **kw: state.picked
     forms.pick_folder = lambda **kw: state.answers.get("folder")
-    forms.SelectFromList = types.SimpleNamespace(        # answers["pick"], else the first item
-        show=lambda items, title="", button_name="", **kw: state.lists.append(list(items)) or
-        state.answers.get("pick", items[0] if items else None))
     forms.CommandSwitchWindow = types.SimpleNamespace(
         show=lambda options, message="", **kw: state.switch.append((options, message)) or
         state.answers.get("switch"))
+
+    def select_from_list(items, title="", multiselect=False, **kw):
+        """answers["pick"], else the first item (as a list when multiselect)."""
+        state.lists.append((title, list(items)))
+        if "pick" in state.answers:
+            return state.answers["pick"]
+        first = list(items)[:1]
+        return first if multiselect else (first[0] if first else None)
+    forms.SelectFromList = types.SimpleNamespace(show=select_from_list)
     revit_mod = types.ModuleType("pyrevit.revit")
     revit_mod.doc = doc
     revit_mod.uidoc = None

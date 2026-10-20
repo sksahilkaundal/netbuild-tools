@@ -21,7 +21,7 @@ Owner and publisher: **Netbuild**. Website: **https://skaec.com**. Brand: **Netb
   entry / TransactionGroup name.
 - A command-line exe keeps a short name without spaces (e.g. `LevelShift.exe`).
 - pyRevit: all buttons live in the shared `Netbuild.extension` (tab **Netbuild**), one panel per
-  discipline (e.g. `Levels.panel`), plus the **About** panel (`About.panel/About.pushbutton` and
+  discipline (e.g. `Levels.panel`, `Stairs.panel`), plus the **About** panel (`About.panel/About.pushbutton` and
   `Licence.pushbutton`), which
   stays last (`Netbuild.tab/bundle.yaml` `layout:`). Button `__author__ = "Netbuild -- skaec.com"`.
   The same extension also holds the **Netbuild Tools 01** and **Netbuild Tools 02** tabs (Sahil's

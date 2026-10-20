@@ -1,0 +1,59 @@
+name: Build BUA Update by Netbuild (Windows)
+
+on:
+  push:
+    branches: [main, "netbuild/**"]
+    paths: ["BuaUpdate/**", "LevelShifter/pyRevit/**", "LevelShifter/tests/pyrevit_stubs.py",
+            ".github/workflows/build-bua-update-exe.yml"]
+  pull_request:
+    paths: ["BuaUpdate/**", "LevelShifter/pyRevit/**", "LevelShifter/tests/pyrevit_stubs.py",
+            ".github/workflows/build-bua-update-exe.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install pyinstaller==6.11.1 -r BuaUpdate/requirements.txt
+
+      - name: Unit tests (engine, command line, window and the pyRevit button)
+        run: python -m unittest discover -s BuaUpdate/tests -v
+
+      - name: Build "BUA Update by Netbuild.exe" (window) and BuaUpdate.exe (command line)
+        working-directory: BuaUpdate
+        run: |
+          python make_version_file.py version_window.txt "BUA Update by Netbuild.exe"
+          python make_version_file.py version_cli.txt BuaUpdate.exe
+          pyinstaller --noconfirm --onefile --windowed --name "BUA Update by Netbuild" --version-file version_window.txt BuaUpdate.pyw
+          pyinstaller --noconfirm --onefile --console --name BuaUpdate --version-file version_cli.txt BuaUpdate_cli.py
+
+      - name: Smoke test the frozen exe
+        run: python BuaUpdate/tests/smoke_exe.py BuaUpdate/dist/BuaUpdate.exe
+
+      - name: Package (app + the shared pyRevit extension with the app in its bin folder)
+        shell: pwsh
+        run: |
+          $app = "pkg/BUA Update by Netbuild"
+          $ext = "pkg/pyRevit/Netbuild.extension"
+          New-Item -ItemType Directory -Force $app, pkg/pyRevit | Out-Null
+          Copy-Item "BuaUpdate/dist/BUA Update by Netbuild.exe", BuaUpdate/dist/BuaUpdate.exe, BuaUpdate/README.md, BuaUpdate/BUA_Update_PromptTemplate.md, LICENSE $app/
+          Copy-Item -Recurse LevelShifter/pyRevit/Netbuild.extension pkg/pyRevit/
+          New-Item -ItemType Directory -Force "$ext/bin" | Out-Null
+          Copy-Item "BuaUpdate/dist/BUA Update by Netbuild.exe" "$ext/bin/"
+          Copy-Item LICENSE $ext/
+          Get-ChildItem pkg -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
+          Get-ChildItem pkg -Recurse -File | Format-Table FullName, Length
+          (Get-Item "$app/BUA Update by Netbuild.exe").VersionInfo | Format-List CompanyName, ProductName, ProductVersion, LegalCopyright
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BuaUpdate-by-Netbuild-windows
+          path: pkg/
+          retention-days: 90
