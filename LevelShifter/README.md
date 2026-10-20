@@ -30,6 +30,7 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
    - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
 4. A **Netbuild** tab appears with these panels:
    - **Levels**, holding **Level Shift** and **Level Shift App**;
+   - **Areas**, holding **BUA Update** (opens BUA Update by Netbuild, see [`BuaUpdate/`](../BuaUpdate/README.md));
    - **Sheets**, holding **Align Viewports** (see [`AlignViewports/`](../AlignViewports/README.md));
    - **Scripts**, holding **Script Folder** and **Update Scripts** (see *Script folder* below);
    - **About**, holding **About** (product info, version, requirements) and **Licence** (the licensing page).

@@ -11,10 +11,11 @@ from System.Diagnostics import Process
 from System.Windows import Clipboard
 
 from align_viewports import about as align_viewports_about
+from bua_update import about as bua_update_about
 from level_shift import about as level_shift_about
 import levelshift_ui as ui
 
-PRODUCTS = [level_shift_about, align_viewports_about]
+PRODUCTS = [level_shift_about, bua_update_about, align_viewports_about]
 
 
 class AboutWindow(forms.WPFWindow):
