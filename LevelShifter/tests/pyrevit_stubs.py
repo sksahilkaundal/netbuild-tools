@@ -44,6 +44,7 @@ class Control(object):
         d["_checked"] = el.get("IsChecked") == "True"
         d["_selected"] = None
         d["Items"] = Items()
+        d["SelectedItems"] = Items()        # a ListBox with SelectionMode="Extended"
         for name in ("Click", "TextChanged", "SelectionChanged", "Checked"):
             d[name] = Event()
 

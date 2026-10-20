@@ -2,6 +2,9 @@
 
 Script: `C:\SK\OneDrive\Netbuild\scripts\align_viewports_from_reference_sheet.py`
 
+Also a ribbon button that needs no Claude session: **Netbuild -> Sheets -> Align Viewports**
+(*Align Viewports by Netbuild*, see `AlignViewports/README.md`).
+
 Fill in the <placeholders> and paste into Claude Code:
 
 ---
