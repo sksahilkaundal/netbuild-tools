@@ -48,6 +48,10 @@ IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DI
                                                             "netbuild_roundtrip.py", "buaupdate_app.py",
                                                             os.path.join("bua_update", "__init__.py"),
                                                             os.path.join("bua_update", "about.py"),
+                                                            "clearwarnings_ui.py",
+                                                            os.path.join("clear_warnings", "__init__.py"),
+                                                            os.path.join("clear_warnings", "about.py"),
+                                                            os.path.join("clear_warnings", "core.py"),
                                                             "stair_path_ui.py", os.path.join("stair_path", "__init__.py"),
                                                             os.path.join("stair_path", "about.py"),
                                                             os.path.join("stair_path", "rules.py"),
@@ -118,6 +122,7 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertGreater(len(BUTTON_SCRIPTS), 20)
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Areas", "-", "Stairs", "-",
+                                                "Warnings", "-",
                                                 "Scripts", "-", "About"])
         with open(os.path.join(EXT, "Netbuild.tab", "About.panel", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "About", "-", "Licence"])
