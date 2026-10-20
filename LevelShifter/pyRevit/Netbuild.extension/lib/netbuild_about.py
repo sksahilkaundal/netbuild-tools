@@ -10,11 +10,12 @@ from pyrevit import forms
 from System.Diagnostics import Process
 from System.Windows import Clipboard
 
+from bua_update import about as bua_update_about
 from clear_warnings import about as clear_warnings_about
 from level_shift import about as level_shift_about
 import levelshift_ui as ui
 
-PRODUCTS = [level_shift_about, clear_warnings_about]
+PRODUCTS = [level_shift_about, bua_update_about, clear_warnings_about]
 
 
 class AboutWindow(forms.WPFWindow):

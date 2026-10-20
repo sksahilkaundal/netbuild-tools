@@ -1,5 +1,6 @@
 layout:
   - Levels
+  - Areas
   - Warnings
   - Scripts
   - About

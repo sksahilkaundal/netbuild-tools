@@ -257,10 +257,11 @@ class ButtonTests(unittest.TestCase):
         self.assertIn("| 6 | %s |" % fw.AREA_TEXT, st.printed[2])
         self.assertEqual(self.doc.log, [])                              # read-only
 
-    def test_netbuild_about_button_lists_both_products(self):
+    def test_netbuild_about_button_lists_every_product(self):
         st = self.install(pick="Clear Warnings by Netbuild")
         runpy.run_path(ABOUT, run_name="__main__")
-        self.assertEqual(st.picks[-1], ["Level Shift by Netbuild", "Clear Warnings by Netbuild"])
+        self.assertEqual(st.lists[-1][1], ["Level Shift by Netbuild", "BUA Update by Netbuild",
+                                           "Clear Warnings by Netbuild"])
         self.assertEqual(pyrevit_stubs.WPFWindow.shown[-1].Title, "About Clear Warnings by Netbuild")
 
 

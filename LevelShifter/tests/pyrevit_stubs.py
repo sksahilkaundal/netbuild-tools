@@ -141,7 +141,7 @@ class Config(object):
 def install(doc, answers=None):
     """Put stub pyrevit / System modules in sys.modules. Returns a namespace the test inspects."""
     state = types.SimpleNamespace(alerts=[], started=[], config=Config(), saved=0, answers=answers or {},
-                                  picked=None, clipboard=[], switch=[], reloaded=0, printed=[], picks=[])
+                                  picked=None, clipboard=[], lists=[], switch=[], reloaded=0, printed=[])
 
     def alert(msg, title="", yes=False, no=False, exitscript=False, **kw):
         state.alerts.append((title, msg))
@@ -161,11 +161,18 @@ def install(doc, answers=None):
     forms.ask_for_string = lambda prompt="", title="", **kw: state.answers.get("ask")
     forms.pick_file = lambda **kw: state.picked
     forms.pick_folder = lambda **kw: state.answers.get("folder")
-    forms.SelectFromList = types.SimpleNamespace(           # the answer, or the first item
-        show=lambda items, **kw: state.picks.append(list(items)) or state.answers.get("pick", list(items)[0]))
     forms.CommandSwitchWindow = types.SimpleNamespace(
         show=lambda options, message="", **kw: state.switch.append((options, message)) or
         state.answers.get("switch"))
+
+    def select_from_list(items, title="", multiselect=False, **kw):
+        """answers["pick"], else the first item (as a list when multiselect)."""
+        state.lists.append((title, list(items)))
+        if "pick" in state.answers:
+            return state.answers["pick"]
+        first = list(items)[:1]
+        return first if multiselect else (first[0] if first else None)
+    forms.SelectFromList = types.SimpleNamespace(show=select_from_list)
     revit_mod = types.ModuleType("pyrevit.revit")
     revit_mod.doc = doc
     revit_mod.uidoc = None
