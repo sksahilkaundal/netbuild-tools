@@ -98,8 +98,8 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertIn('__author__ = "Netbuild -- skaec.com"\n\nimport netbuild_scripts\n'
                       'netbuild_scripts.run_live(globals())', src)          # runs from the script folder when set
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
-            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Cleanup", "-", "Scripts", "-",
-                                                "About"])                                          # About last
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Areas", "-", "Warnings", "-",
+                                                "Cleanup", "-", "Scripts", "-", "About"])             # About last
 
 
 class ButtonTests(unittest.TestCase):
@@ -256,7 +256,7 @@ class ButtonTests(unittest.TestCase):
     def test_ribbon_about_and_licence_list_this_product(self):
         st = pyrevit_stubs.install(self.doc, answers={"pick": "Element Remover by Netbuild"})
         runpy.run_path(ABOUT, run_name="__main__")
-        self.assertEqual(st.lists[-1][1], ["Level Shift by Netbuild", "Element Remover by Netbuild"])
+        self.assertIn("Element Remover by Netbuild", st.lists[-1][1])      # listed with every Netbuild product
         self.check_about(pyrevit_stubs.WPFWindow.shown[-1])
         runpy.run_path(LICENCE, run_name="__main__")
         self.check_licence(pyrevit_stubs.WPFWindow.shown[-1])

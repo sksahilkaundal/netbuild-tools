@@ -44,7 +44,13 @@ IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DI
                                                                        FOLDER, UPDATE] +
                     [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py",
                                                             "netbuild_about.py", "netbuild_scripts.py",
-                                                            "netbuild_roundtrip.py")])
+                                                            "netbuild_roundtrip.py", "buaupdate_app.py",
+                                                            os.path.join("bua_update", "__init__.py"),
+                                                            os.path.join("bua_update", "about.py"),
+                                                            "clearwarnings_ui.py",
+                                                            os.path.join("clear_warnings", "__init__.py"),
+                                                            os.path.join("clear_warnings", "about.py"),
+                                                            os.path.join("clear_warnings", "core.py"))])
 BUTTON_SCRIPTS = sorted(os.path.join(d, n) for d, _, files in os.walk(EXT) for n in files
                         if n in ("script.py", "config.py") and d.endswith(".pushbutton"))
 IRONPYTHON_FILES += [p for p in BUTTON_SCRIPTS if p not in IRONPYTHON_FILES]
@@ -110,8 +116,8 @@ class ExtensionFileTests(unittest.TestCase):
             self.assertIn("netbuild_scripts.run_live(globals())", src, script_path)
         self.assertGreater(len(BUTTON_SCRIPTS), 20)
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
-            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Cleanup", "-", "Scripts", "-",
-                                                "About"])
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Areas", "-", "Warnings", "-",
+                                                "Cleanup", "-", "Scripts", "-", "About"])
         with open(os.path.join(EXT, "Netbuild.tab", "About.panel", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "About", "-", "Licence"])
 

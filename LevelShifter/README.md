@@ -30,6 +30,8 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
    - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
 4. A **Netbuild** tab appears with these panels:
    - **Levels**, holding **Level Shift** and **Level Shift App**;
+   - **Areas**, holding **BUA Update** (opens BUA Update by Netbuild, see [`BuaUpdate/`](../BuaUpdate/README.md));
+   - **Warnings**, holding **Warnings Summary** and **Clear Warnings** (*Clear Warnings by Netbuild*, below);
    - **Cleanup**, holding **Element Remover** (see [`ElementRemover/`](../ElementRemover/README.md));
    - **Scripts**, holding **Script Folder** and **Update Scripts** (see *Script folder* below);
    - **About**, holding **About** (product info, version, requirements) and **Licence** (the licensing page).
@@ -103,6 +105,41 @@ Which folder is used, first match wins:
 To update the extension after changing the engine, run `python LevelShifter/sync_pyrevit_lib.py`.
 It copies the shared files into `Netbuild.extension\lib\level_shift`, and the tests fail while the
 copies differ.
+
+## Clear Warnings by Netbuild (Warnings panel)
+
+Clears the warnings a model collects from Areas, dead references and duplicate Type Marks. It is the
+`scripts\clear_model_warnings.py` pipeline (developed on `ProjectC-Studio-BIM-B001-ZZZ-BM-950001`: 2,120
+warnings -> 0) as two ribbon buttons. They run inside Revit with pyRevit only: no exe, no MCP listener.
+
+- **Warnings Summary** (read-only) prints every warning of the active model to the pyRevit output,
+  grouped by its description. It also says whether the model matches the **B001 profile**: at least half
+  of the warnings are on Areas or Area Separation Lines, so steps 1 - 3 clear most of them.
+- **Clear Warnings** opens a window titled `Clear Warnings by Netbuild <version> -- <model>`. It shows the
+  active model and its summary, with six steps that are each optional and run in this order:
+
+| Step | What it does | Leaves alone (listed for manual review) |
+|---|---|---|
+| 1 | Deletes the Area Plan views and the schedules of Areas | view templates; the active view |
+| 2 | Deletes all Areas | -- |
+| 3 | Deletes all Area Separation Lines | -- |
+| 4 | Deletes orphaned Matchlines (no owner view) | a **live** Matchline still in a warning. Revit refuses to edit a Matchline sketch from the API, so fix it by hand with Edit Sketch |
+| 5 | Deletes Room Tags flagged *outside of its Room* whose room reference is dangling | a tag with a **valid** room that is only out of place: move it into its room by hand |
+| 6 | Gives each duplicate Type Mark group unique marks. It tries a keyword prefix first (`ritz=RITZ-; dormakaba=DK-`, editable in the window), then a thickness suffix for Walls and Floors (`W1-200`), then a letter suffix (`D1b`). It skips marks already used in the model | -- |
+
+There are two ways to run it:
+- **Dry run** reports what each step would target and changes nothing.
+- **Run** asks for confirmation first. Every step goes into one Undo entry (*Clear Warnings by Netbuild*).
+  If Revit refuses anything, for example an element borrowed by another user, the whole run is rolled back.
+
+The report lists the warnings before and after, the change for each description, and the **manual review**
+items by element Id. *Copy report* puts it on the clipboard. Each run writes a log to
+`%APPDATA%\Netbuild\ClearWarnings\logs`. The ticked steps and the Type Mark prefixes are remembered.
+Steps 1 - 3 delete **every** Area in the model: run them only where the areas are not needed or are kept
+in another model.
+
+To run the same pipeline from Claude through the Revit MCP `execute_revit_code` tool instead, use
+`scripts\clear_model_warnings_PromptTemplate.md`.
 
 ## The window
 
