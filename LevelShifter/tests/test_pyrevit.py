@@ -51,7 +51,11 @@ IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DI
                                                             "alignviewports_ui.py",
                                                             os.path.join("align_viewports", "__init__.py"),
                                                             os.path.join("align_viewports", "about.py"),
-                                                            os.path.join("align_viewports", "core.py"))])
+                                                            os.path.join("align_viewports", "core.py"),
+                                                            "clearwarnings_ui.py",
+                                                            os.path.join("clear_warnings", "__init__.py"),
+                                                            os.path.join("clear_warnings", "about.py"),
+                                                            os.path.join("clear_warnings", "core.py"))])
 BUTTON_SCRIPTS = sorted(os.path.join(d, n) for d, _, files in os.walk(EXT) for n in files
                         if n in ("script.py", "config.py") and d.endswith(".pushbutton"))
 IRONPYTHON_FILES += [p for p in BUTTON_SCRIPTS if p not in IRONPYTHON_FILES]
@@ -118,7 +122,7 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertGreater(len(BUTTON_SCRIPTS), 20)
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Areas", "-", "Sheets", "-",
-                                                "Scripts", "-", "About"])
+                                                "Warnings", "-", "Scripts", "-", "About"])
         with open(os.path.join(EXT, "Netbuild.tab", "About.panel", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "About", "-", "Licence"])
 
