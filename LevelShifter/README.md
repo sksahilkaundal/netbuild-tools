@@ -32,6 +32,7 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
    - **Levels**, holding **Level Shift** and **Level Shift App**;
    - **Areas**, holding **BUA Update** (opens BUA Update by Netbuild, see [`BuaUpdate/`](../BuaUpdate/README.md));
    - **Sheets**, holding **Align Viewports** (see [`AlignViewports/`](../AlignViewports/README.md));
+   - **Stairs**, holding **Stair Path** (Stair Path by Netbuild -- see [`StairPath/README.md`](../StairPath/README.md));
    - **Warnings**, holding **Warnings Summary** and **Clear Warnings** (*Clear Warnings by Netbuild*, below);
    - **Scripts**, holding **Script Folder** and **Update Scripts** (see *Script folder* below);
    - **About**, holding **About** (product info, version, requirements) and **Licence** (the licensing page).
@@ -319,6 +320,9 @@ The tests cover:
 - shape-change rollback;
 - paused, unreachable or stale Revit replies;
 - the CLI and the window.
+
+`tests\test_stair_path.py` covers Stair Path by Netbuild the same way, against its own stand-in model
+(`tests\fake_stairs.py`).
 
 ## About
 
