@@ -30,6 +30,8 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
    - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
 4. A **Netbuild** tab appears with these panels:
    - **Levels**, holding **Level Shift** and **Level Shift App**;
+   - **Models**, holding **Model Prep** and **Place Links** (*Model Prep by Netbuild*, see
+     [`ModelPrep.md`](pyRevit/ModelPrep.md));
    - **Areas**, holding **BUA Update** (opens BUA Update by Netbuild, see [`BuaUpdate/`](../BuaUpdate/README.md));
    - **Sheets**, holding **Align Viewports** (see [`AlignViewports/`](../AlignViewports/README.md));
    - **Stairs**, holding **Stair Path** (Stair Path by Netbuild -- see [`StairPath/README.md`](../StairPath/README.md));
@@ -324,6 +326,8 @@ The tests cover:
 
 `tests\test_stair_path.py` covers Stair Path by Netbuild the same way, against its own stand-in model
 (`tests\fake_stairs.py`).
+
+`test_model_prep.py` covers Model Prep by Netbuild against its own stand-in model (`tests\fake_links.py`).
 
 ## About
 
