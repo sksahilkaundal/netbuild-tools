@@ -331,7 +331,8 @@ class NetbuildToolsAboutTests(unittest.TestCase):
             st = pyrevit_stubs.install(fake.doc, answers={"pick": "Netbuild Tools by Netbuild"})
             runpy.run_path(os.path.join(EXT, "Netbuild.tab", "About.panel", "About.pushbutton", "script.py"),
                            run_name="__main__")
-            self.assertEqual(st.picks[-1], ["Level Shift by Netbuild", "Netbuild Tools by Netbuild"])
+            products = st.lists[-1][1]                                     # every Netbuild product is listed
+            self.assertEqual((products[0], products[-1]), ("Level Shift by Netbuild", "Netbuild Tools by Netbuild"))
             win = pyrevit_stubs.WPFWindow.shown[-1]
             self.assertEqual(win.Title, "About Netbuild Tools by Netbuild")
             self.assertIn("Version 1.0.0", win.version_tb.Text)

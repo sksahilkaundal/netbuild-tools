@@ -26,6 +26,11 @@ LICENCE = os.path.join(EXT, "Netbuild.tab", "About.panel", "Licence.pushbutton",
 SCRIPTS = os.path.join(EXT, "Netbuild.tab", "Scripts.panel")
 FOLDER = os.path.join(SCRIPTS, "Script Folder.pushbutton", "script.py")
 UPDATE = os.path.join(SCRIPTS, "Update Scripts.pushbutton", "script.py")
+MODELS = os.path.join(EXT, "Netbuild.tab", "Models.panel")
+MODEL_PREP = os.path.join(MODELS, "Model Prep.pushbutton", "script.py")
+PLACE_LINKS = os.path.join(MODELS, "Place Links.pushbutton", "script.py")
+ALIGN = os.path.join(EXT, "Netbuild.tab", "Sheets.panel", "Align Viewports.pushbutton", "script.py")
+STAIR_PATH = os.path.join(EXT, "Netbuild.tab", "Stairs.panel", "Stair Path.pushbutton", "script.py")
 APP_EXE = "Level Shift by Netbuild.exe"
 sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
@@ -41,12 +46,34 @@ sys.path.insert(0, os.path.join(ROOT))
 from sync_pyrevit_lib import SHARED  # noqa: E402
 
 IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DIRECT, APP, APP_CONFIG, ABOUT, LICENCE,
-                                                                       FOLDER, UPDATE] +
+                                                                       FOLDER, UPDATE, STAIR_PATH] +
                     [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py",
                                                             "netbuild_about.py", "netbuild_scripts.py",
                                                             "netbuild_roundtrip.py",
                                                             os.path.join("netbuild_tools", "__init__.py"),
-                                                            os.path.join("netbuild_tools", "about.py"))])
+                                                            os.path.join("netbuild_tools", "about.py"),
+                                                            "modelprep_ui.py",
+                                                            os.path.join("model_prep", "__init__.py"),
+                                                            os.path.join("model_prep", "about.py"),
+                                                            os.path.join("model_prep", "core.py"),
+                                                            os.path.join("model_prep", "revit.py"),
+                                                            os.path.join("model_prep", "rules.py"),
+                                                            os.path.join("model_prep", "xlsx.py"),
+                                                            "buaupdate_app.py",
+                                                            os.path.join("bua_update", "__init__.py"),
+                                                            os.path.join("bua_update", "about.py"),
+                                                            "alignviewports_ui.py",
+                                                            os.path.join("align_viewports", "__init__.py"),
+                                                            os.path.join("align_viewports", "about.py"),
+                                                            os.path.join("align_viewports", "core.py"),
+                                                            "clearwarnings_ui.py",
+                                                            os.path.join("clear_warnings", "__init__.py"),
+                                                            os.path.join("clear_warnings", "about.py"),
+                                                            os.path.join("clear_warnings", "core.py"),
+                                                            "stair_path_ui.py", os.path.join("stair_path", "__init__.py"),
+                                                            os.path.join("stair_path", "about.py"),
+                                                            os.path.join("stair_path", "rules.py"),
+                                                            os.path.join("stair_path", "engine.py"))])
 BUTTON_SCRIPTS = sorted(os.path.join(d, n) for d, _, files in os.walk(EXT) for n in files
                         if n in ("script.py", "config.py") and d.endswith(".pushbutton"))
 IRONPYTHON_FILES += [p for p in BUTTON_SCRIPTS if p not in IRONPYTHON_FILES]
@@ -96,7 +123,8 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertIn("New elevation (mm)", ET.tostring(dlg, encoding="unicode"))
 
     def test_icons_and_titles(self):
-        for script_path in (DIRECT, APP, ABOUT, LICENCE, FOLDER, UPDATE):
+        for script_path in (DIRECT, APP, ABOUT, LICENCE, FOLDER, UPDATE, ALIGN, STAIR_PATH, MODEL_PREP,
+                            PLACE_LINKS):
             with open(os.path.join(os.path.dirname(script_path), "icon.png"), "rb") as f:
                 self.assertEqual(f.read(8), b"\x89PNG\r\n\x1a\n")
             with open(script_path, encoding="utf-8") as f:
@@ -112,7 +140,9 @@ class ExtensionFileTests(unittest.TestCase):
             self.assertIn("netbuild_scripts.run_live(globals())", src, script_path)
         self.assertGreater(len(BUTTON_SCRIPTS), 20)
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
-            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Scripts", "-", "About"])
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Models", "-", "Areas", "-", "Sheets", "-",
+                                                "Stairs", "-", "Warnings", "-", "Cleanup", "-", "Scripts", "-",
+                                                "About"])
         with open(os.path.join(EXT, "Netbuild.tab", "About.panel", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "About", "-", "Licence"])
 
@@ -286,7 +316,10 @@ class ButtonTests(unittest.TestCase):
     def test_about_button(self):
         st = pyrevit_stubs.install(self.doc, answers={"pick": "Level Shift by Netbuild"})
         runpy.run_path(ABOUT, run_name="__main__")
-        self.assertEqual(st.picks[-1], ["Level Shift by Netbuild", "Netbuild Tools by Netbuild"])
+        self.assertEqual(st.lists[-1][1][0], "Level Shift by Netbuild")      # every Netbuild product is listed
+        self.assertIn("Align Viewports by Netbuild", st.lists[-1][1])
+        self.assertIn("Model Prep by Netbuild", st.lists[-1][1])
+        self.assertIn("Netbuild Tools by Netbuild", st.lists[-1][1])
         win = pyrevit_stubs.WPFWindow.shown[-1]
         self.check_about(win)
         win.copy_btn.click()
@@ -303,6 +336,7 @@ class ButtonTests(unittest.TestCase):
         from level_shift import about
         st = pyrevit_stubs.install(self.doc, answers={"pick": "Level Shift by Netbuild"})
         runpy.run_path(LICENCE, run_name="__main__")
+        self.assertIn("Model Prep by Netbuild", st.lists[-1][1])
         win = pyrevit_stubs.WPFWindow.shown[-1]
         self.check_licence(win)
         win.copy_btn.click()
