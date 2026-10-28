@@ -49,7 +49,7 @@ copies differ.
 | **Filters** | Rule-based view filters (`rules on Walls, Doors`) and saved selection filters (`saved selection, 12 elements`). Ctrl+Click picks several |
 | **OR / AND** | With both worksets and filters picked: remove what is on a workset **or** passes a filter (the default), or only what is on a workset **and** passes a filter |
 | **Only categories** | Blank = every category. Type `Walls, Doors`, click **Walls only**, or **Pick…** from the categories in use |
-| **Options** | *Elements inside model groups: ungroup, remove, regroup* (on) · *Merge identical regrouped group types* (on) · *Remove pinned elements too* (off) · *Model elements only* (on) |
+| **Options** | *Elements inside model groups: ungroup, remove, regroup* (on) · *Merge identical regrouped group types* (on) · *Then delete the picked worksets once empty* (off, Revit 2022+) · *Remove pinned elements too* (off) · *Model elements only* (on) |
 
 ### Steps
 
@@ -134,6 +134,26 @@ deleted with all its members, and nothing is ungrouped.
 
 Untick **Elements inside model groups** to leave group members alone; they are then listed as skipped.
 
+### Deleting the emptied worksets (option, Revit 2022+)
+
+Tick *Then delete the picked worksets once empty* (or use `--delete-worksets`). After the removal, each
+workset you picked as a target is deleted, **but only when no model content is left on it**:
+- Internal elements Revit keeps on a workset, such as sketch planes, are **moved** to the active workset,
+  never deleted.
+- The deletion itself uses Revit's *move elements to another workset* setting, so nothing that the check
+  missed can be lost.
+- It is part of the same single Undo entry. Trial run rolls it back like everything else.
+
+**Check** says, for each picked workset, whether it would be deleted, or why it would stay. The workset
+is **kept**, and the reason reported, when:
+- elements remain on it: pinned ones you did not include, levels / grids and other protected elements, or
+  categories you did not pick;
+- another user has borrowed the workset;
+- it is your **active workset**: make another one active first;
+- Revit refuses, or the Revit version is 2019 – 2021, which have no API to delete a workset.
+
+A workset that is kept is never an error: the elements are still removed.
+
 Revit **warnings** raised by the deletion (joins, attachments, room separation, …) are dismissed and listed.
 Any **error** rolls the whole removal back.
 
@@ -162,6 +182,7 @@ ElementRemover apply --workset "Demolition" --filter "All Walls" --both   :: on 
 ElementRemover apply --workset "Demolition" --include-pinned    :: pinned elements too (unpinned first)
 ElementRemover apply --workset "Demolition" --no-groups         :: leave group members alone
 ElementRemover apply --filter "To Remove" --no-merge            :: one group type per regrouped instance
+ElementRemover apply --workset "Demolition" --delete-worksets   :: then delete the workset once empty (Revit 2022+)
 ElementRemover --model B003-Studio-ARC sources                     :: bind to a model by title
 ElementRemover setup --set skip_pinned=false                    :: settings
 ElementRemover about                                            :: product info, requirements
@@ -176,6 +197,7 @@ ElementRemover license                                          :: the licence: 
 |---|---|---|
 | `skip_pinned` | true | Pinned targets (and targets inside pinned groups) are listed, not removed |
 | `fix_groups` | true | Targets inside model groups: ungroup, remove, regroup |
+| `delete_worksets` | false | Revit 2022+: then delete each picked workset once no model content is left on it (internal elements move to the active workset) |
 | `merge_groups` | true | Regrouped instances that are identical, member by member, share one group type again (their members get new Element Ids) |
 | `model_only` | true | Annotation and view-specific elements are never removed |
 | `max_rows` | 20000 | Element rows returned and written to the CSV |
@@ -211,6 +233,8 @@ The tests cover:
 - trial leaving the model unchanged;
 - standalone, grouped, nested and whole-group removal, and the type names after regrouping;
 - merging identical regrouped types, and refusing it for a mirrored instance or different Marks;
+- deleting an emptied workset (its sketch plane moved, not deleted), and keeping it when something is left,
+  it is active, it is borrowed, or the Revit version has no workset-delete API;
 - pinned elements and groups, borrowed elements, names not found, Revit warnings and errors;
 - the CLI, the listener route and the window.
 
@@ -233,6 +257,7 @@ https://skaec.com. All of it comes from one file, `element_remover/about.py`.
 | **ElementRemover.exe** | Windows 10 / 11 64-bit, no Python needed · Revit open with pyRevit and the Revit MCP extension, its listener running (MCP Status on) at `http://127.0.0.1:48884` |
 | From source | Python 3.9 or later |
 | The model | A project model opened editable (not read-only) · when workshared, the worksets holding the targets open, and the targets and their groups not borrowed by other users · Save / Synchronize after Apply |
+| Deleting the emptied worksets (option) | Revit 2022 or later · the workset not borrowed by another user and not the active workset |
 
 ### Licence
 

@@ -32,6 +32,12 @@ category, type, workset, phase, Mark, Comments, bounding box, location, facing /
 mirror state (positions within 1 mm).  Any difference (a rotated or mirrored instance, other Marks,
 Revit refusing) rolls that switch back and the instance keeps its own type.  A merged instance's members are new elements (new Element Ids), so their tags go.
 
+Deleting the emptied worksets (``delete_worksets``, Revit 2022+): after the removal, each workset picked
+as a target is deleted when no model content is left on it.  Internal elements Revit keeps there (sketch
+planes, ...) are moved to the active workset, never deleted -- the deletion itself uses "move elements
+to another workset", so nothing that was missed can be lost.  A workset another user owns, the active
+workset, or one Revit refuses to delete is kept and reported.
+
 What Revit deletes with a target (hosted doors / windows, tags, dimensions, sketches, ...) is found by
 deleting once in a probe transaction that is rolled back, so every deleted element is reported by Id.
 """
@@ -378,6 +384,54 @@ def _same(a, b):
     return True
 
 
+def _ws_api():
+    """(WorksetTable, DeleteWorksetSettings, DeleteWorksetOption), or None before Revit 2022."""
+    try:
+        from Autodesk.Revit.DB import WorksetTable, DeleteWorksetSettings, DeleteWorksetOption
+    except ImportError:
+        return None
+    if not hasattr(WorksetTable, "DeleteWorkset"):
+        return None
+    return WorksetTable, DeleteWorksetSettings, DeleteWorksetOption
+
+
+def _content(el):
+    """True for model content; False for element types and the internal elements Revit keeps on a
+    workset (sketches, sketch planes, elements without a category) -- those are moved, not deleted."""
+    if isinstance(el, ElementType) or type(el).__name__ in ("Sketch", "SketchPlane"):
+        return False
+    try:
+        return el.Category is not None
+    except Exception:
+        return False
+
+
+def _on_workset(d, wsid):
+    return list(FilteredElementCollector(d).WherePasses(ElementWorksetFilter(wsid, False))
+                .WhereElementIsNotElementType())
+
+
+def _ws_blocked(d, ws):
+    """Why a workset cannot be deleted now (None: it can, once empty)."""
+    if _ws_api() is None:
+        return "deleting a workset needs Revit 2022 or later"
+    if not ws.IsOpen:
+        return "the workset is closed"
+    owner = _txt(getattr(ws, "Owner", "") or "")
+    try:
+        me = _txt(d.Application.Username)
+    except Exception:
+        me = ""
+    if owner and owner.lower() != me.lower():
+        return "borrowed by %s" % owner
+    try:
+        if _iid(d.GetWorksetTable().GetActiveWorksetId()) == _iid(ws.Id):
+            return "it is the active workset -- make another one active"
+    except Exception:
+        pass
+    return None
+
+
 def _main():
     d = _pick_doc()
     if _ER["action"] == "sources":
@@ -387,11 +441,12 @@ def _main():
     skip_pinned = bool(_ER.get("skip_pinned", True))
     fix_groups = bool(_ER.get("fix_groups", True))
     merge_groups = bool(_ER.get("merge_groups", True))
+    delete_worksets = bool(_ER.get("delete_worksets", False))
     max_rows = int(_ER.get("max_rows", 20000))
 
     # ---- resolve the targets: worksets and / or filters, then categories
     missing, closed = [], []
-    on_ws = None
+    on_ws, ws_targets = None, []
     if _ER.get("worksets"):
         on_ws = {}
         by_name = dict((_txt(w.Name).strip().lower(), w) for w in _user_worksets(d))
@@ -403,6 +458,9 @@ def _main():
                 continue
             if not ws.IsOpen:
                 closed.append(_txt(ws.Name))
+            if [w for w in ws_targets if _iid(w.Id) == _iid(ws.Id)]:
+                continue
+            ws_targets.append(ws)
             col = FilteredElementCollector(d).WherePasses(ElementWorksetFilter(ws.Id, False))
             for el in col.WhereElementIsNotElementType():
                 on_ws.setdefault(_iid(el.Id), [el, []])[1].append("workset " + _txt(ws.Name))
@@ -495,6 +553,18 @@ def _main():
             out[r[key]] = out.get(r[key], 0) + 1
         return sorted([k, v] for k, v in out.items())
 
+    ws_plan = []
+    if delete_worksets:
+        going = set(targets) | set(r["id"] for r in covered)
+        for ws in ws_targets:
+            stay = {}
+            for el in _on_workset(d, ws.Id):
+                if _content(el) and _iid(el.Id) not in going:
+                    c = _txt(el.Category.Name)
+                    stay[c] = stay.get(c, 0) + 1
+            ws_plan.append({"name": _txt(ws.Name), "blocked": _ws_blocked(d, ws) or "",
+                            "stay": sum(stay.values()), "stay_cats": sorted([k, v] for k, v in stay.items())})
+
     sources = {}
     for el, why in targets.values():
         for w in why:
@@ -506,7 +576,7 @@ def _main():
                    "by_source": sorted([k, v] for k, v in sources.items()),
                    "skipped": len(skipped), "skipped_why": sorted([k, v] for k, v in skip_why.items()),
                    "blockers": blockers, "missing": missing, "closed": closed, "modifiable": not d.IsReadOnly,
-                   "fix_groups": fix_groups, "merge_groups": merge_groups,
+                   "fix_groups": fix_groups, "merge_groups": merge_groups, "worksets": ws_plan,
                    "rows": sorted(list(rows.values()) + covered + skipped, key=lambda r: r["id"])[:max_rows]})
     if _ER["action"] == "plan":
         return
@@ -634,6 +704,57 @@ def _main():
                 done.append(rec)
         return done
 
+    def delete_ws():
+        """Delete each picked workset that has no model content left (internal leftovers move to the active
+        workset). Returns one record per picked workset."""
+        out = []
+        api = _ws_api()
+        for ws0 in ws_targets:
+            ws = d.GetWorksetTable().GetWorkset(ws0.Id)
+            rec = {"name": _txt(ws.Name), "deleted": False, "moved": 0, "why": "", "stay_cats": []}
+            out.append(rec)
+            stay, moved = {}, 0
+            for el in _on_workset(d, ws.Id):
+                if _content(el):
+                    c = _txt(el.Category.Name)
+                    stay[c] = stay.get(c, 0) + 1
+                else:
+                    moved += 1
+            if stay:
+                rec["why"] = "%d element(s) left on it" % sum(stay.values())
+                rec["stay_cats"] = sorted([k, v] for k, v in stay.items())
+                continue
+            rec["why"] = _ws_blocked(d, ws) or ""
+            if rec["why"]:
+                continue
+            table, settings_cls, option = api
+            settings = settings_cls(option.MoveElementsToWorkset, d.GetWorksetTable().GetActiveWorksetId())
+            try:
+                if hasattr(table, "CanDeleteWorkset") and not table.CanDeleteWorkset(d, ws.Id, settings):
+                    rec["why"] = "Revit cannot delete it"
+                    continue
+            except Exception:
+                pass
+            n = len(_MSGS)
+            t = Transaction(d, "Element Remover: delete workset")
+            opts = t.GetFailureHandlingOptions()
+            opts.SetFailuresPreprocessor(_ErFailures())
+            t.SetFailureHandlingOptions(opts)
+            t.Start()
+            try:
+                table.DeleteWorkset(d, ws.Id, settings)
+            except Exception as e:
+                t.RollBack()
+                del _MSGS[n:]
+                rec["why"] = "Revit refused: %s" % _txt(e)[:120]
+                continue
+            if t.Commit() != TransactionStatus.Committed:
+                rec["why"] = "Revit refused: %s" % "; ".join(m[1] for m in _MSGS[n:] if m[0] == "error")[:160]
+                del _MSGS[n:]
+                continue
+            rec["deleted"], rec["moved"] = True, moved
+        return out
+
     def delete(ids):
         """Delete the targets (unpinning them first when asked); returns every id Revit deleted."""
         for i in ids:
@@ -669,6 +790,7 @@ def _main():
         if regrouped and not regroup():
             raise Exception("ER: Revit refused to regroup -- %s" % "; ".join(errors_now()))
         merged = merge() if regrouped and merge_groups else []
+        ws_done = delete_ws() if delete_worksets and ws_targets else []
 
         gone = set(_iid(x) for x in gone)
         left = []
@@ -714,7 +836,7 @@ def _main():
     all_rows = sorted(list(rows.values()) + covered + deps + skipped, key=lambda r: r["id"])
     _emit("RESULT", {"committed": committed, "requested": len(rows), "deleted": len(rows) - len(left),
                      "with_group": len(covered), "dependents": counts(deps, "category"), "total": len(gone),
-                     "left": left, "groups": groups, "notes": notes,
+                     "left": left, "groups": groups, "notes": notes, "worksets": ws_done,
                      "warnings": [t for k, t in _MSGS if k == "warning"], "errors": errors,
                      "rows": all_rows[:max_rows]})
 

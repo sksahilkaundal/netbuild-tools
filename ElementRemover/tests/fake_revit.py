@@ -11,6 +11,9 @@ with Revit's behaviour where it matters:
 * switching a group instance's type (Group.GroupType = t) rebuilds its members as new elements from the
   type's definition, placed relative to the instance's origin (the lowest member position) -- so a
   mirrored or differently laid-out instance comes out different, as in Revit;
+* worksets (Revit 2022+ API): WorksetTable.DeleteWorkset moves what is left on the workset to the
+  settings' target (or deletes it), refuses the active workset and works only inside a Transaction;
+  a rolled-back Transaction / TransactionGroup brings the workset back;
 * model groups: a member cannot be deleted while it is grouped (Revit keeps the instances of a type
   identical), a pinned group cannot be ungrouped, group types need unique names, a type still in
   use cannot be deleted, nested groups;
@@ -165,6 +168,13 @@ class Element(object):
         return self.doc.family_type(self.Name) if self.Category is not None else INVALID
 
 
+class SketchPlane(Element):
+    """An internal element Revit keeps on a workset (no category)."""
+
+    def __init__(self, doc, ws):
+        super().__init__(doc, None, "Sketch plane", ws)
+
+
 class ElementType(Element):
     pass
 
@@ -268,6 +278,38 @@ class Group(Element):
 class Workset(object):
     def __init__(self, n, name, is_open=True, kind=WorksetKind.UserWorkset):
         self.Id, self.Name, self.IsOpen, self.Kind = WorksetId(n), name, is_open, kind
+        self.Owner = ""                     # user who borrowed the workset ("" = nobody)
+
+
+DeleteWorksetOption = _Enum("DeleteAllElements", "MoveElementsToWorkset")
+
+
+class DeleteWorksetSettings(object):
+    def __init__(self, option, target=None):
+        self.option, self.target = option, target
+
+
+class WorksetTable(object):
+    """Revit 2022+ statics (tests remove them from the stub module to stand for Revit 2019 - 2021)."""
+
+    @staticmethod
+    def CanDeleteWorkset(doc, wsid, settings):
+        ws = [w for w in doc.worksets if w.Id == wsid]
+        return bool(ws) and ws[0].Kind == WorksetKind.UserWorkset and wsid != doc.active_ws
+
+    @staticmethod
+    def DeleteWorkset(doc, wsid, settings):
+        if doc.tx is None:
+            raise Exception("Attempt to modify the model outside of transaction.")
+        if not WorksetTable.CanDeleteWorkset(doc, wsid, settings):
+            raise Exception("the workset cannot be deleted")
+        for el in [e for e in doc.by_id.values() if e.WorksetId == wsid]:
+            doc.touch(el)
+            if settings.option == DeleteWorksetOption.DeleteAllElements:
+                doc.remove(el)
+            else:
+                el.WorksetId = settings.target
+        doc.worksets = [w for w in doc.worksets if w.Id != wsid]
 
 
 class ElementWorksetFilter(object):
@@ -464,7 +506,8 @@ class WorksharingUtils(object):
 
 def install_stubs():
     db = types.ModuleType("Autodesk.Revit.DB")
-    for name in ("BuiltInCategory", "BuiltInParameter", "Category", "CategoryType", "ElementId", "ElementMulticategoryFilter",
+    for name in ("WorksetTable", "DeleteWorksetSettings", "DeleteWorksetOption",
+                 "BuiltInCategory", "BuiltInParameter", "Category", "CategoryType", "ElementId", "ElementMulticategoryFilter",
                  "ElementType", "ElementWorksetFilter", "FailureProcessingResult", "FailureSeverity", "Group",
                  "IFailuresPreprocessor", "ParameterFilterElement", "SelectionFilterElement", "Transaction",
                  "TransactionGroup", "TransactionStatus", "View", "WorksetKind", "WorksharingUtils",
@@ -522,7 +565,8 @@ class Doc(object):
 
     def GetWorksetTable(self):
         return types.SimpleNamespace(GetWorkset=lambda wid: ([w for w in self.worksets if w.Id == wid] or
-                                                             [Workset(wid.IntegerValue, "?")])[0])
+                                                             [Workset(wid.IntegerValue, "?")])[0],
+                                     GetActiveWorksetId=lambda: self.active_ws)
 
     def add(self, el):
         self.by_id[el.Id.Value] = el
@@ -535,13 +579,18 @@ class Doc(object):
             raise Exception("Attempt to modify the model outside of transaction.")
         self.touched.add(el.Id.Value)
 
-    STATE = ("GroupId", "Name", "_pinned", "IsValidObject", "members", "type_id")
+    STATE = ("GroupId", "Name", "_pinned", "IsValidObject", "members", "type_id", "WorksetId")
+    WS = "worksets"                         # snapshot key holding the workset list
 
     def snapshot(self):
-        return dict((i, (e, dict((k, copy.deepcopy(e.__dict__[k])) for k in self.STATE if k in e.__dict__)))
+        snap = dict((i, (e, dict((k, copy.deepcopy(e.__dict__[k])) for k in self.STATE if k in e.__dict__)))
                     for i, e in self.by_id.items())
+        snap[self.WS] = list(self.worksets)
+        return snap
 
     def restore(self, snap):
+        snap = dict(snap)
+        self.worksets = list(snap.pop(self.WS))
         for e in self.by_id.values():
             if e.Id.Value not in snap:
                 e.IsValidObject = False     # created after the snapshot
@@ -659,7 +708,7 @@ class Doc(object):
 class FakeRevit(object):
     def __init__(self):
         install_stubs()
-        self.app = types.SimpleNamespace(Documents=[])
+        self.app = types.SimpleNamespace(Documents=[], Username="user")
         self.paused = False
         self.calls = 0
         self.lock = threading.Lock()
@@ -668,6 +717,7 @@ class FakeRevit(object):
         d.worksets = [Workset(LG, "Shared Levels and Grids"), Workset(ARC, "Architecture"),
                       Workset(DEMO, "Demolition"), Workset(INT, "Interiors"), Workset(SITE, "Site", is_open=False),
                       Workset(100, "Views", kind=WorksetKind.ViewWorkset)]
+        d.active_ws = WorksetId(ARC)
         e = self.el = {}
         e["L01"] = Level(d, "OST_Levels", "L01", LG)
         e["L02"] = Level(d, "OST_Levels", "L02", LG)

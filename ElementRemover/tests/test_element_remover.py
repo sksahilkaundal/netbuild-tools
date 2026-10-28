@@ -15,7 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
-from fake_revit import FakeRevit, Group  # noqa: E402
+from fake_revit import FakeRevit, Group, SketchPlane, WorksetId  # noqa: E402
 from element_remover import about, cli, core, revit  # noqa: E402
 from element_remover.core import Targets  # noqa: E402
 from element_remover.payload import CODE  # noqa: E402
@@ -353,6 +353,90 @@ class FilterTests(Fixture):
         self.assertEqual(self.grouped_with("store shelf 3")[0], "Store (elements removed)")
 
 
+class WorksetDeleteTests(Fixture):
+    """--delete-worksets: a picked workset is deleted once nothing but internal elements is left on it."""
+
+    def emptiable(self):
+        """Demolition, with its grid moved away and a sketch plane Revit keeps there."""
+        self.el["grid B"].WorksetId = WorksetId(1)
+        self.el["sketch plane"] = SketchPlane(self.doc, 3)
+        self.snap0 = self.doc.snapshot()
+
+    def names(self):
+        return [w.Name for w in self.doc.worksets]
+
+    def test_plan_says_what_stays(self):
+        out = self.run_("plan", ["Demolition"], delete_worksets=True)
+        self.assertEqual(out["PLAN"]["worksets"], [{"name": "Demolition", "blocked": "", "stay": 2,
+                                                    "stay_cats": [["Floors", 1], ["Grids", 1]]}])
+        checks, _ = core.plan_checks(out["PLAN"])
+        kept = [c for c in checks if c.label == "Workset 'Demolition' kept"][0]
+        self.assertEqual((kept.ok, kept.detail), (None, "2 element(s) on it are not removed: Floors x1, Grids x1"))
+        out = self.run_("apply", ["Demolition"], delete_worksets=True)  # pinned slab + protected grid stay
+        self.assertTrue(out["RESULT"]["committed"])
+        self.assertIn("Demolition", self.names())
+        self.assertEqual(out["RESULT"]["worksets"][0]["why"], "2 element(s) left on it")
+
+    def test_deleted_once_empty(self):
+        self.emptiable()
+        plan = self.run_("plan", ["Demolition"], skip_pinned=False, delete_worksets=True)["PLAN"]
+        self.assertEqual(plan["worksets"][0]["stay"], 0)
+        out = self.run_("trial", ["Demolition"], skip_pinned=False, delete_worksets=True)
+        self.assertTrue(out["RESULT"]["worksets"][0]["deleted"])
+        self.assertTrue(self.unchanged())                               # trial: the workset is back
+        self.assertIn("Demolition", self.names())
+        out = self.run_("apply", ["Demolition"], skip_pinned=False, delete_worksets=True)
+        r = out["RESULT"]
+        self.assertTrue(r["committed"], r)
+        self.assertNotIn("Demolition", self.names())
+        self.assertEqual(r["worksets"], [{"name": "Demolition", "deleted": True, "moved": 1, "why": "",
+                                          "stay_cats": []}])
+        self.assertEqual(self.el["sketch plane"].WorksetId, WorksetId(2))   # moved to the active workset
+        self.assertTrue(self.doc.alive(self.el["sketch plane"]))
+        checks, _ = core.result_checks("apply", r)
+        self.assertIn("[OK  ] Workset deleted -- 'Demolition' (1 internal element(s) moved to the active workset)",
+                      [str(c) for c in checks])
+        self.assertEqual(self.doc.groups[-1], ("Element Remover by Netbuild", "assimilated"))   # one Undo entry
+
+    def test_kept_when_active_borrowed_or_old_revit(self):
+        self.emptiable()
+        cases = []
+
+        def active():
+            self.doc.active_ws = WorksetId(3)
+
+        def borrowed():
+            [w for w in self.doc.worksets if w.Name == "Demolition"][0].Owner = "jane.d"
+
+        def old_revit():
+            import sys
+            del sys.modules["Autodesk.Revit.DB"].WorksetTable          # Revit 2019 - 2021 have no DeleteWorkset
+        for setup, want in ((active, "it is the active workset"), (borrowed, "borrowed by jane.d"),
+                            (old_revit, "deleting a workset needs Revit 2022 or later")):
+            self.fake.close()
+            Fixture.setUp(self)
+            self.emptiable()
+            setup()
+            plan = self.run_("plan", ["Demolition"], skip_pinned=False, delete_worksets=True)["PLAN"]
+            self.assertTrue(plan["worksets"][0]["blocked"].startswith(want), plan["worksets"])
+            out = self.run_("apply", ["Demolition"], skip_pinned=False, delete_worksets=True)
+            r = out["RESULT"]
+            self.assertTrue(r["committed"], r)                         # the removal itself goes ahead
+            self.assertEqual(r["errors"], [])
+            self.assertIn("Demolition", self.names())
+            self.assertTrue(r["worksets"][0]["why"].startswith(want))
+            cases.append(want)
+        self.assertEqual(len(cases), 3)
+
+    def test_off_by_default(self):
+        self.emptiable()
+        out = self.run_("apply", ["Demolition"], skip_pinned=False)
+        self.assertTrue(out["RESULT"]["committed"])
+        self.assertIn("Demolition", self.names())
+        self.assertEqual((out["PLAN"]["worksets"], out["RESULT"]["worksets"]), ([], []))
+        self.assertIs(core.config("n", "apply")["delete_worksets"], False)
+
+
 class SafetyTests(Fixture):
     def test_borrowed_element_blocks_apply(self):
         self.doc.owners[self.el["demo wall 2"].Id.Value] = "jane.d"
@@ -496,6 +580,8 @@ class ListenerTests(Fixture):
         rc, out = self.cli("apply", "--filter", "To Remove", "--no-merge")
         self.assertEqual(rc, 0, out)
         self.assertIn("Toilet Core (2)", self.doc.type_names())
+        rc, out = self.cli("plan", "--workset", "Demolition", "--delete-worksets")
+        self.assertIn("[WARN] Workset 'Demolition' kept", out)
         rc, out = self.cli("apply", "--workset", "Demolition", "--include-pinned")
         self.assertEqual(rc, 0, out)
         self.assertEqual(self.gone("demo slab", "store wall 3"), ["demo slab", "store wall 3"])

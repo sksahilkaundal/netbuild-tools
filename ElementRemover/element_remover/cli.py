@@ -49,6 +49,9 @@ def main(argv=None):
         p.add_argument("--include-pinned", action="store_true", help="remove pinned elements too (unpins them)")
         p.add_argument("--no-groups", action="store_true",
                        help="leave elements inside model groups alone (default: ungroup, remove, regroup)")
+        p.add_argument("--delete-worksets", action="store_true",
+                       help="then delete each --workset that is left empty (Revit 2022+; internal elements on it "
+                            "move to the active workset)")
         p.add_argument("--no-merge", action="store_true",
                        help="keep one group type per regrouped instance (default: identical ones share a type; "
                             "their members get new Element Ids)")
@@ -110,6 +113,8 @@ def main(argv=None):
         s["fix_groups"] = False
     if a.no_merge:
         s["merge_groups"] = False
+    if a.delete_worksets:
+        s["delete_worksets"] = True
     s.save_last({"model_match": s["model_match"], "targets": targets.as_dict()})
     return _report(runner.run(a.cmd, targets))
 
