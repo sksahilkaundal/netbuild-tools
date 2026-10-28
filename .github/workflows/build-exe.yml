@@ -1,0 +1,45 @@
+name: Build ProjectA Report Runner (Windows exe)
+
+on:
+  push:
+    branches: [main, "netbuild/**"]
+    paths: ["ProjectA_ReportRunner/**", ".github/workflows/build-exe.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install pyinstaller==6.11.1 pypdf
+
+      - name: Unit tests (Windows)
+        run: python -m unittest discover -s ProjectA_ReportRunner/tests -v
+
+      - name: Build ProjectA_ReportRunner.exe (window) and ProjectA.exe (command line)
+        working-directory: ProjectA_ReportRunner
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name ProjectA_ReportRunner --add-data "projecta_runner\overrides.py;projecta_runner" ProjectA_ReportRunner.pyw
+          pyinstaller --noconfirm --onefile --console --name ProjectA --add-data "projecta_runner\overrides.py;projecta_runner" ProjectA_cli.py
+
+      - name: Smoke test the frozen exe
+        run: python ProjectA_ReportRunner/tests/smoke_exe.py ProjectA_ReportRunner/dist/ProjectA.exe
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force pkg/ProjectA_ReportRunner | Out-Null
+          Copy-Item ProjectA_ReportRunner/dist/ProjectA_ReportRunner.exe, ProjectA_ReportRunner/dist/ProjectA.exe, ProjectA_ReportRunner/README.md pkg/ProjectA_ReportRunner/
+          Get-ChildItem pkg/ProjectA_ReportRunner | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ProjectA_ReportRunner-windows
+          path: pkg/
+          retention-days: 90
