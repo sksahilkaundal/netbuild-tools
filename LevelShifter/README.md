@@ -34,6 +34,7 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
    - **Sheets**, holding **Align Viewports** (see [`AlignViewports/`](../AlignViewports/README.md));
    - **Stairs**, holding **Stair Path** (Stair Path by Netbuild -- see [`StairPath/README.md`](../StairPath/README.md));
    - **Warnings**, holding **Warnings Summary** and **Clear Warnings** (*Clear Warnings by Netbuild*, below);
+   - **Cleanup**, holding **Element Remover** (see [`ElementRemover/`](../ElementRemover/README.md));
    - **Scripts**, holding **Script Folder** and **Update Scripts** (see *Script folder* below);
    - **About**, holding **About** (product info, version, requirements) and **Licence** (the licensing page).
 

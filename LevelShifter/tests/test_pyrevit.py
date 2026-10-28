@@ -127,7 +127,8 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertGreater(len(BUTTON_SCRIPTS), 20)
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Areas", "-", "Sheets", "-",
-                                                "Stairs", "-", "Warnings", "-", "Scripts", "-", "About"])
+                                                "Stairs", "-", "Warnings", "-", "Cleanup", "-", "Scripts", "-",
+                                                "About"])
         with open(os.path.join(EXT, "Netbuild.tab", "About.panel", "bundle.yaml")) as f:
             self.assertEqual(f.read().split(), ["layout:", "-", "About", "-", "Licence"])
 

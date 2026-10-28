@@ -1,0 +1,55 @@
+name: Build Element Remover by Netbuild (Windows)
+
+on:
+  push:
+    branches: [main, "netbuild/**"]
+    paths: ["ElementRemover/**", "LevelShifter/pyRevit/**", "LevelShifter/tests/pyrevit_stubs.py",
+            ".github/workflows/build-element-remover-exe.yml"]
+  pull_request:
+    paths: ["ElementRemover/**", "LevelShifter/pyRevit/**", "LevelShifter/tests/pyrevit_stubs.py",
+            ".github/workflows/build-element-remover-exe.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install pyinstaller==6.11.1
+
+      - name: Unit tests (engine, command line and the pyRevit button)
+        run: python -m unittest discover -s ElementRemover/tests -v
+
+      - name: Build ElementRemover.exe (command line)
+        working-directory: ElementRemover
+        run: |
+          python make_version_file.py version_cli.txt ElementRemover.exe
+          pyinstaller --noconfirm --onefile --console --name ElementRemover --version-file version_cli.txt ElementRemover_cli.py
+
+      - name: Smoke test the frozen exe
+        run: python ElementRemover/tests/smoke_exe.py ElementRemover/dist/ElementRemover.exe
+
+      - name: Package (command line + the shared pyRevit extension)
+        shell: pwsh
+        run: |
+          $app = "pkg/Element Remover by Netbuild"
+          $ext = "pkg/pyRevit/Netbuild.extension"
+          New-Item -ItemType Directory -Force $app, pkg/pyRevit | Out-Null
+          Copy-Item ElementRemover/dist/ElementRemover.exe, ElementRemover/README.md, LICENSE $app/
+          Copy-Item -Recurse LevelShifter/pyRevit/Netbuild.extension pkg/pyRevit/
+          Copy-Item LICENSE $ext/
+          Get-ChildItem pkg -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
+          Get-ChildItem pkg -Recurse -File | Format-Table FullName, Length
+          (Get-Item "$app/ElementRemover.exe").VersionInfo | Format-List CompanyName, ProductName, ProductVersion, LegalCopyright
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ElementRemover-by-Netbuild-windows
+          path: pkg/
+          retention-days: 90

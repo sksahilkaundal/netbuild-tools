@@ -262,7 +262,7 @@ class ButtonTests(unittest.TestCase):
         runpy.run_path(ABOUT, run_name="__main__")
         self.assertEqual(st.lists[-1][1], ["Level Shift by Netbuild", "BUA Update by Netbuild",
                                            "Clear Warnings by Netbuild", "Stair Path by Netbuild",
-                                           "Align Viewports by Netbuild"])
+                                           "Align Viewports by Netbuild", "Element Remover by Netbuild"])
         self.assertEqual(pyrevit_stubs.WPFWindow.shown[-1].Title, "About Clear Warnings by Netbuild")
 
 
