@@ -1,0 +1,11 @@
+title: |-
+  Export
+  Schedule
+tooltip: >
+  Exports the OPEN schedule to an editable Excel workbook: one row per element,
+  Element ID in column A, grey band per Building Asset (or Level), totals row.
+  Area schedules use the curated Area layout; any other schedule gets all its
+  visible columns. Only this model's elements (linked rows are left out).
+  Totals are checked against the Revit schedule. Read-only - nothing in the
+  model changes. Edit the workbook, save it, then use Import Excel.
+author: "Netbuild -- skaec.com"

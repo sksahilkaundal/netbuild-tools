@@ -1,0 +1,6 @@
+title: |-
+  Join Same
+  Material
+tooltip: >
+  Joins Wall-Wall, Wall-Floor, Floor-Floor pairs sharing a material keyword; floor always kept dominant. Curtain walls excluded except a configured type.
+author: "Netbuild -- skaec.com"

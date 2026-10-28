@@ -1,0 +1,6 @@
+title: |-
+  Unjoin Non-
+  Intersecting
+tooltip: >
+  Clears joined-but-do-not-intersect warnings by unjoining the flagged element pairs.
+author: "Netbuild -- skaec.com"

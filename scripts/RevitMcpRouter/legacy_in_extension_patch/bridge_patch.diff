@@ -1,0 +1,136 @@
+diff --git a/main.py b/main.py
+index a93492a..8c76924 100644
+--- a/main.py
++++ b/main.py
+@@ -4,7 +4,11 @@ import httpx
+ import anyio
+ from mcp.server.fastmcp import FastMCP, Image, Context
+ import base64
++import functools
++from urllib.parse import urlencode
+ from typing import Optional, Dict, Any, Union
++from revit_mcp_safety import check_revit_status, call_revit_route
++from revit_mcp_router import router, RouterError
+ 
+ # Create a generic MCP server for interacting with Revit
+ # Use stateless_http=True and json_response=True for better compatibility
+@@ -17,9 +21,15 @@ mcp = FastMCP(
+ )
+ 
+ # Configuration
++# Port is resolved per call by revit_mcp_router: pyRevit gives each running
++# Revit its own port (48884, 48885, ...). See revit_list_sessions /
++# revit_select_session below, or env REVIT_MCP_TARGET in ~/.claude.json.
+ REVIT_HOST = "127.0.0.1"
+ REVIT_PORT = 48884
+ BASE_URL = f"http://{REVIT_HOST}:{REVIT_PORT}/revit_mcp"
++# revit_mcp_safety.REVIT_BASE_URL has no route root, so every endpoint below
++# ("/status/", "/execute_code/", ...) is prefixed with this before being sent.
++ROUTE_PREFIX = "/revit_mcp"
+ 
+ 
+ async def revit_get(endpoint: str, ctx: Context = None, **kwargs) -> Union[Dict, str]:
+@@ -35,37 +45,41 @@ async def revit_post(endpoint: str, data: Dict[str, Any], ctx: Context = None, *
+ async def revit_image(endpoint: str, ctx: Context = None) -> Union[Image, str]:
+     """GET request that returns an Image object"""
+     try:
+-        async with httpx.AsyncClient(timeout=60.0) as client:
+-            response = await client.get(f"{BASE_URL}{endpoint}")
+-            
+-            if response.status_code == 200:
+-                data = response.json()
+-                image_bytes = base64.b64decode(data["image_data"])
+-                return Image(data=image_bytes, format="png")
+-            else:
+-                return f"Error: {response.status_code} - {response.text}"
+-    except httpx.TimeoutException:
+-        return "Error: Image export timed out after 60 seconds."
++        result = await _safe_route("GET", endpoint, timeout=60.0)
++        if result.get("success"):
++            image_bytes = base64.b64decode(result["data"]["image_data"])
++            return Image(data=image_bytes, format="png")
++        return f"Error: {result.get('error')}"
+     except Exception as e:
+         msg = str(e) or type(e).__name__
+         return f"Error: {msg}"
+ 
+ 
++async def _safe_route(method: str, endpoint: str, data: Dict = None,
++                      timeout: float = 30.0, params: Dict = None) -> Dict:
++    """Run call_revit_route() from revit_mcp_safety in a worker thread.
++
++    call_revit_route() is synchronous (blocking httpx), so it is pushed to a
++    thread to keep the MCP event loop responsive during long Revit operations.
++    It never raises; it always returns {"success": bool, "data"|"error": ...}.
++    """
++    route = f"{ROUTE_PREFIX}{endpoint}"
++    if params:
++        route = f"{route}?{urlencode(params)}"
++    return await anyio.to_thread.run_sync(
++        functools.partial(call_revit_route, route, method=method, payload=data, timeout=timeout)
++    )
++
++
+ async def _revit_call(method: str, endpoint: str, data: Dict = None, ctx: Context = None,
+                      timeout: float = 30.0, params: Dict = None) -> Union[Dict, str]:
+-    """Internal function handling all HTTP calls"""
++    """Internal function handling all HTTP calls (routed through revit_mcp_safety)"""
+     try:
+-        async with httpx.AsyncClient(timeout=timeout) as client:
+-            url = f"{BASE_URL}{endpoint}"
+-
+-            if method == "GET":
+-                response = await client.get(url, params=params)
+-            else:  # POST
+-                response = await client.post(url, json=data, headers={"Content-Type": "application/json"})
+-
+-            return response.json() if response.status_code == 200 else f"Error: {response.status_code} - {response.text}"
+-    except httpx.TimeoutException:
+-        return f"Error: Request timed out after {timeout} seconds. The operation may still be running in Revit."
++        result = await _safe_route(method, endpoint, data=data, timeout=timeout, params=params)
++        # Preserve the historical contract: dict on success, "Error: ..." string otherwise.
++        if result.get("success"):
++            return result["data"]
++        return f"Error: {result.get('error')}"
+     except Exception as e:
+         msg = str(e) or type(e).__name__
+         return f"Error: {msg}"
+@@ -76,6 +90,38 @@ from tools import register_tools
+ register_tools(mcp, revit_get, revit_post, revit_image)
+ 
+ 
++@mcp.tool()
++async def revit_status(ctx: Context = None) -> dict:
++    """Check whether Revit + pyRevit Routes are alive. Never raises.
++    Run this before any tool that modifies the model."""
++    return await anyio.to_thread.run_sync(check_revit_status)
++
++
++@mcp.tool()
++async def revit_list_sessions(ctx: Context = None) -> dict:
++    """List every running Revit instance reachable through pyRevit Routes
++    (port, Revit version, pid, active document) and which one THIS Claude
++    session's tools are currently routed to. Use it when more than one Revit
++    is open, or when a tool reports it cannot reach Revit."""
++    return await anyio.to_thread.run_sync(router.describe, True)
++
++
++@mcp.tool()
++async def revit_select_session(target: str = "auto", ctx: Context = None) -> dict:
++    """Route this Claude session's Revit tools to one specific Revit instance.
++    target: 'auto' (only one Revit open), 'port:48885', 'doc:<active document
++    title substring>', 'version:2026', 'pid:<Revit pid>'. A doc: target is
++    safest - it follows that document even if Revit restarts on another port,
++    and refuses to run if that document is no longer the active one.
++    Other Claude sessions are not affected. Returns the routed session."""
++    def _select():
++        try:
++            return router.set_target(target)
++        except RouterError as e:
++            return {"success": False, "error": str(e), "sessions": router.describe(rescan=False)["sessions"]}
++    return await anyio.to_thread.run_sync(_select)
++
++
+ async def run_combined_async():
+     """Run server with both SSE and streamable-http endpoints.
+ 

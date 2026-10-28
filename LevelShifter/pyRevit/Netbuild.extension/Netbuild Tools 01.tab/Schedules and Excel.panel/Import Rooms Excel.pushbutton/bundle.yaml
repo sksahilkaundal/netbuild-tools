@@ -1,0 +1,6 @@
+title: |-
+  Import Rooms
+  from Excel
+tooltip: >
+  Imports room parameter values from an Excel file back into the model, matched by Room UniqueId.
+author: "Netbuild -- skaec.com"

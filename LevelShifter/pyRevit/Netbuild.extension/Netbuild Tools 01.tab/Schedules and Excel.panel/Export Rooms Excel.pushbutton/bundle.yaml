@@ -1,0 +1,9 @@
+title: |-
+  Export Rooms
+  to Excel
+tooltip: >
+  Exports all placed rooms (area, volume, offsets, department, etc.) to an
+  Excel file in metric units. Prompts you to choose the save location and
+  filename each time, defaulting to a date-stamped folder under
+  C:\Users\user\OneDrive - Studio\Projects\ProjectA\Exports (auto-created).
+author: "Netbuild -- skaec.com"

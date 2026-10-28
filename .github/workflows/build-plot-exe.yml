@@ -1,0 +1,51 @@
+name: Build Plot Runner by Netbuild (Windows)
+
+on:
+  push:
+    branches: [main, "netbuild/**"]
+    paths: ["ProjectA_PlotRunner/**", ".github/workflows/build-plot-exe.yml"]
+  pull_request:
+    paths: ["ProjectA_PlotRunner/**", ".github/workflows/build-plot-exe.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install pyinstaller==6.11.1
+
+      - name: Unit tests (Windows, includes the window test)
+        run: python -m unittest discover -s ProjectA_PlotRunner/tests -v
+
+      - name: Build "Plot Runner by Netbuild.exe" (window) and ProjectAPlot.exe (command line)
+        working-directory: ProjectA_PlotRunner
+        run: |
+          python make_version_file.py version_window.txt "Plot Runner by Netbuild.exe"
+          python make_version_file.py version_cli.txt ProjectAPlot.exe
+          pyinstaller --noconfirm --onefile --windowed --name "Plot Runner by Netbuild" --version-file version_window.txt ProjectA_PlotRunner.pyw
+          pyinstaller --noconfirm --onefile --console --name ProjectAPlot --version-file version_cli.txt ProjectAPlot_cli.py
+
+      - name: Smoke test the frozen exe
+        run: python ProjectA_PlotRunner/tests/smoke_exe.py ProjectA_PlotRunner/dist/ProjectAPlot.exe
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $app = "pkg/Plot Runner by Netbuild"
+          New-Item -ItemType Directory -Force $app | Out-Null
+          Copy-Item "ProjectA_PlotRunner/dist/Plot Runner by Netbuild.exe", ProjectA_PlotRunner/dist/ProjectAPlot.exe, ProjectA_PlotRunner/README.md, LICENSE $app/
+          Get-ChildItem $app | Format-Table Name, Length
+          (Get-Item "$app/Plot Runner by Netbuild.exe").VersionInfo | Format-List CompanyName, ProductName, ProductVersion, LegalCopyright
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PlotRunner-by-Netbuild-windows
+          path: pkg/
+          retention-days: 90
