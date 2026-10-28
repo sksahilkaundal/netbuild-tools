@@ -49,7 +49,10 @@ IRONPYTHON_FILES = ([os.path.join(ROOT, "level_shift", n) for n in SHARED] + [DI
                                                                        FOLDER, UPDATE, STAIR_PATH] +
                     [os.path.join(EXT, "lib", n) for n in ("levelshift_ui.py", "levelshift_app.py",
                                                             "netbuild_about.py", "netbuild_scripts.py",
-                                                            "netbuild_roundtrip.py", "modelprep_ui.py",
+                                                            "netbuild_roundtrip.py",
+                                                            os.path.join("netbuild_tools", "__init__.py"),
+                                                            os.path.join("netbuild_tools", "about.py"),
+                                                            "modelprep_ui.py",
                                                             os.path.join("model_prep", "__init__.py"),
                                                             os.path.join("model_prep", "about.py"),
                                                             os.path.join("model_prep", "core.py"),
@@ -316,6 +319,7 @@ class ButtonTests(unittest.TestCase):
         self.assertEqual(st.lists[-1][1][0], "Level Shift by Netbuild")      # every Netbuild product is listed
         self.assertIn("Align Viewports by Netbuild", st.lists[-1][1])
         self.assertIn("Model Prep by Netbuild", st.lists[-1][1])
+        self.assertIn("Netbuild Tools by Netbuild", st.lists[-1][1])
         win = pyrevit_stubs.WPFWindow.shown[-1]
         self.check_about(win)
         win.copy_btn.click()

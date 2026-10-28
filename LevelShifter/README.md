@@ -51,6 +51,10 @@ CSVs to `%APPDATA%\Netbuild\LevelShift\logs`.
 
 ### Script folder: update every button from one place
 
+*Netbuild Tools by Netbuild 1.0.0* -- the Scripts panel and the Netbuild Tools 01 / 02 tabs are this product.
+Its About / Licence: **Netbuild -> About** (pick it from the list), **Script Folder -> About Netbuild Tools**,
+or `python add_live_header.py about | licence | --version`.
+
 Keep the current button folders in one place -- a network share, or a synced OneDrive / ACC / BIM 360
 folder -- in whatever sub-folders you like. A button is matched by its folder name, at any depth:
 
