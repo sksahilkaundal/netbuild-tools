@@ -1,0 +1,55 @@
+name: Build Stair Path by Netbuild (Windows)
+
+on:
+  push:
+    branches: [main, "netbuild/**"]
+    paths: ["StairPath/**", "LevelShifter/pyRevit/**", "LevelShifter/tests/fake_stairs.py",
+            ".github/workflows/build-stair-path-exe.yml"]
+  pull_request:
+    paths: ["StairPath/**", "LevelShifter/pyRevit/**", "LevelShifter/tests/fake_stairs.py",
+            ".github/workflows/build-stair-path-exe.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install pyinstaller==6.11.1
+
+      - name: Unit tests (command line, listener route, payload and lib copies)
+        run: python -m unittest discover -s StairPath/tests -v
+
+      - name: Build StairPath.exe (command line)
+        working-directory: StairPath
+        run: |
+          python make_version_file.py version_cli.txt StairPath.exe
+          pyinstaller --noconfirm --onefile --console --name StairPath --version-file version_cli.txt StairPath_cli.py
+
+      - name: Smoke test the frozen exe
+        run: python StairPath/tests/smoke_exe.py StairPath/dist/StairPath.exe
+
+      - name: Package (command line + the shared pyRevit extension)
+        shell: pwsh
+        run: |
+          $app = "pkg/Stair Path by Netbuild"
+          $ext = "pkg/pyRevit/Netbuild.extension"
+          New-Item -ItemType Directory -Force $app, pkg/pyRevit | Out-Null
+          Copy-Item StairPath/dist/StairPath.exe, StairPath/README.md, LICENSE $app/
+          Copy-Item -Recurse LevelShifter/pyRevit/Netbuild.extension pkg/pyRevit/
+          Copy-Item LICENSE $ext/
+          Get-ChildItem pkg -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
+          Get-ChildItem pkg -Recurse -File | Format-Table FullName, Length
+          (Get-Item "$app/StairPath.exe").VersionInfo | Format-List CompanyName, ProductName, ProductVersion, LegalCopyright
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StairPath-by-Netbuild-windows
+          path: pkg/
+          retention-days: 90

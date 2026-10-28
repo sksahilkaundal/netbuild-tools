@@ -32,7 +32,6 @@ import stair_path_ui as ui
 
 CFG = script.get_config()
 _BRUSHES = BrushConverter()
-CSV_FIELDS = ["view", "scale", "level", "core", "kind", "stair", "result", "path", "offset_mm", "why"]
 
 
 def logs_dir():
@@ -48,9 +47,9 @@ def write_csv(path, rows):
         v = u"%s" % v
         return u'"%s"' % v.replace(u'"', u'""') if [c for c in u',"\n' if c in v] else v
     with io.open(path, "w", encoding="utf-8-sig", newline="") as f:
-        f.write(u",".join(CSV_FIELDS) + u"\r\n")
+        f.write(u",".join(rules.CSV_FIELDS) + u"\r\n")
         for row in rows:
-            f.write(u",".join(cell(row[k]) for k in CSV_FIELDS) + u"\r\n")
+            f.write(u",".join(cell(row[k]) for k in rules.CSV_FIELDS) + u"\r\n")
     return path
 
 
