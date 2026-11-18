@@ -43,6 +43,9 @@ DEFAULTS = {
     "level_tol_mm": 300.0,          # a flight's base / top snaps to the level within this distance
 }
 
+# columns of the annotation list (CSV) the button and the command line write
+CSV_FIELDS = ["view", "scale", "level", "core", "kind", "stair", "result", "path", "offset_mm", "why"]
+
 NUMBERS = ("dir_x_mm", "dir_y_mm", "std_x_200", "std_y_200", "std_x_100", "std_y_100", "tag_nudge_mm",
            "tag_pad_mm", "core_tol_mm", "level_tol_mm")
 

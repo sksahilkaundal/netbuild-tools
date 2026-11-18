@@ -1,5 +1,5 @@
 """Product information shown in every About screen of Stair Path by Netbuild (its window, the pyRevit
-Netbuild > About / Licence buttons).
+Netbuild > About / Licence buttons, the StairPath command line and the exe's file properties).
 
 IronPython 2.7 + CPython 3. LICENSE_TEXT must equal the repository's LICENSE file -- a test checks it.
 """
@@ -34,6 +34,7 @@ FEATURES = [
     "Room tags nudged off the stair paths, Staircase tags put back inside their room; dimension overlaps listed",
     "Check (plan only) -> Trial run (rolled back) -> Apply (one Undo entry: 'Stair Path by Netbuild')",
     "View templates and View Range are never changed: a level that cannot show its Down is reported as a gap",
+    "StairPath command line / StairPath.exe: the same engine through the pyRevit MCP listener; settings per model",
 ]
 
 REQUIREMENTS = [
@@ -41,6 +42,13 @@ REQUIREMENTS = [
         "Windows 10 / 11, 64-bit",
         "Autodesk Revit 2019 - 2026",
         "pyRevit 4.8 or later, IronPython engine (pyRevit's default)",
+    ]),
+    ("StairPath command line (StairPath.exe)", [
+        "Windows 10 / 11, 64-bit -- no Python needed for the .exe",
+        "Revit open with pyRevit and the Revit MCP extension; its listener running "
+        "(MCP Status: on) at http://127.0.0.1:48884",
+        "'Open plan views' needs the model to be the active window in Revit (or pick views by name)",
+        "From source instead of the .exe: Python 3.9 or later",
     ]),
     ("The model", [
         "A project model (not a family), opened editable -- not read-only",

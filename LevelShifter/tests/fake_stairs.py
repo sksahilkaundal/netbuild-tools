@@ -413,7 +413,9 @@ class TransactionGroup(object):
 class Doc(object):
     def __init__(self, title):
         self.Title = title
-        self.IsFamilyDocument = self.IsReadOnly = False
+        self.PathName = "C:\\Revit_Local\\%s.rvt" % title
+        self.IsFamilyDocument = self.IsReadOnly = self.IsLinked = False
+        self.Application = types.SimpleNamespace(Documents=[self])     # the open models (the listener's view)
         self.by_id, self._next, self.tx = {}, 1000, 0
         self.names, self.groups, self.group_result = [], [], None
 
