@@ -1,0 +1,11 @@
+# Windows wheels bundled into runtime\Lib\site-packages (Python 3.14, win_amd64).
+# ProjectA_IssueExport_Extract.py / ProjectA_IssueReport_Verify.py: pymupdf
+# ProjectA_IssueDetailReport_Build.py: reportlab, pillow
+# prompt pre-flight check (import reportlab, pymupdf, win32com): pywin32
+# BUA / ProjectA Calculations workbooks (openpyxl) and pip (to add a package later without admin)
+pymupdf==1.28.2
+reportlab==5.0.1
+pillow==12.3.0
+pywin32==312
+openpyxl==3.1.5
+pip==26.2.1

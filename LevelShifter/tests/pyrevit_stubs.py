@@ -45,7 +45,7 @@ class Control(object):
         d["_selected"] = None
         d["Items"] = Items()
         d["SelectedItems"] = Items()        # a ListBox with SelectionMode="Extended"
-        for name in ("Click", "TextChanged", "SelectionChanged", "Checked"):
+        for name in ("Click", "TextChanged", "SelectionChanged", "Checked", "Unchecked"):
             d[name] = Event()
 
     # Text / SelectedItem / IsChecked fire their events like WPF
@@ -85,6 +85,8 @@ class Control(object):
                     other.__dict__["_checked"] = False
         if v and not was:
             self.Checked.fire(self)
+        if was and not v:
+            self.Unchecked.fire(self)
 
     def click(self):
         self.Click.fire(self)

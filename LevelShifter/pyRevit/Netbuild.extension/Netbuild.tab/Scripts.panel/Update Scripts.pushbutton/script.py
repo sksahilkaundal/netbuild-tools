@@ -15,8 +15,9 @@ netbuild_scripts.run_live(globals())       # the script folder's copy of this bu
 from pyrevit import forms
 
 import netbuild_scripts as ns
+from netbuild_tools import about
 
-TITLE = "Update Netbuild scripts"
+TITLE = about.title("Update scripts")
 SHOW = 30
 
 
