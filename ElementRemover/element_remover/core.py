@@ -12,6 +12,7 @@ ENGINE_DEFAULTS = {
     "skip_pinned": True,            # pinned targets are listed, not removed
     "fix_groups": True,             # targets inside model groups: ungroup, remove, regroup
     "merge_groups": True,           # regrouped instances that are identical share one group type again
+    "delete_worksets": False,       # Revit 2022+: delete each picked workset once nothing is left on it
     "model_only": True,             # annotation / view-specific elements are never removed
     "max_rows": 20000,              # element rows returned / written to the CSV
 }
@@ -82,7 +83,7 @@ def config(nonce, action, match=(), targets=None, s=None):
     return {"nonce": nonce, "action": action, "match": list(match or []), "worksets": list(t.worksets),
             "filters": list(t.filters), "categories": list(t.categories), "combine": t.combine,
             "skip_pinned": bool(o["skip_pinned"]), "fix_groups": bool(o["fix_groups"]),
-            "merge_groups": bool(o["merge_groups"]),
+            "merge_groups": bool(o["merge_groups"]), "delete_worksets": bool(o["delete_worksets"]),
             "model_only": bool(o["model_only"]), "max_rows": int(o["max_rows"])}
 
 
@@ -148,6 +149,15 @@ def plan_checks(plan):
                                 "Element Ids, so tags on them go)") if plan.get("merge_groups", True) else "")))
     if plan["skipped"]:
         checks.append(Check("Skipped", None, "%d: %s" % (plan["skipped"], _pairs(plan["skipped_why"]))))
+    for w in plan.get("worksets") or []:
+        if w["blocked"]:
+            checks.append(Check("Workset '%s' kept" % w["name"], None, w["blocked"]))
+        elif w["stay"]:
+            checks.append(Check("Workset '%s' kept" % w["name"], None, "%d element(s) on it are not removed: %s" % (
+                w["stay"], _pairs(w["stay_cats"]))))
+        else:
+            checks.append(Check("Workset '%s'" % w["name"], True, "deleted once emptied (internal elements on it, "
+                                                                  "such as sketch planes, move to the active workset)"))
     for b in plan["blockers"]:
         checks.append(Check("Blocked: %s %s" % (b["category"], b["id"]), False, "%s -- %s" % (b["name"], b["why"])))
     if not plan.get("modifiable", True):
@@ -188,6 +198,13 @@ def result_checks(action, r):
         checks.append(Check("Groups regrouped", None, "%d instance(s): %s%s%s" % (
             len(groups), "; ".join(renamed[:8]), ("; %d emptied and gone" % gone) if gone else "",
             "" if not [g for g in groups if g["detail"]] else "; their attached detail groups need re-attaching")))
+    for w in r.get("worksets") or []:
+        if w["deleted"]:
+            checks.append(Check("Workset deleted", True, "'%s'%s" % (w["name"], (
+                " (%d internal element(s) moved to the active workset)" % w["moved"]) if w["moved"] else "")))
+        else:
+            checks.append(Check("Workset kept", None, "'%s': %s%s" % (w["name"], w["why"], (
+                " (%s)" % _pairs(w["stay_cats"])) if w["stay_cats"] else "")))
     for n in r.get("notes") or []:
         lines.append("  " + n)
     warns = r.get("warnings") or []

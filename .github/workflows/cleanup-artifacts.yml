@@ -1,0 +1,30 @@
+name: Clean up old build artifacts
+
+# Keeps the Actions storage quota free: deletes every stored build package except the newest one of
+# each product built from main. Runs weekly, or by hand (Actions -> this workflow -> Run workflow).
+# It uses the repository's own token, so nothing has to be installed on anyone's computer.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"      # Mondays 03:17 UTC
+
+permissions:
+  actions: write              # list and delete artifacts
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep the newest package of each product from main; delete the rest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          R: ${{ github.repository }}
+        run: |
+          gh api --paginate "repos/$R/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired|not) | [.id, .name, .workflow_run.head_branch, .created_at] | @tsv' \
+            | sort -t$'\t' -k4,4r > all.tsv
+          awk -F'\t' '$3=="main" && !seen[$2]++ {next} {print $1}' all.tsv > delete.txt
+          echo "Deleting $(wc -l < delete.txt) of $(wc -l < all.tsv) artifacts"
+          while read -r id; do gh api -X DELETE "repos/$R/actions/artifacts/$id" --silent; done < delete.txt
+          echo "Kept:"; awk -F'\t' '$3=="main" && !seen[$2]++ {print "  " $2 "  (" $4 ")"}' all.tsv

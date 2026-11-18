@@ -71,6 +71,7 @@ class ElementRemoverWindow(forms.WPFWindow):
         s = options()
         self.groups_cb.IsChecked = s["fix_groups"]
         self.merge_cb.IsChecked = s["merge_groups"]
+        self.delws_cb.IsChecked = s["delete_worksets"]
         self.pinned_cb.IsChecked = not s["skip_pinned"]
         self.model_cb.IsChecked = s["model_only"]
         self.all_rb.IsChecked = CFG.get_option("combine", "any") == "all"
@@ -148,6 +149,7 @@ class ElementRemoverWindow(forms.WPFWindow):
     def save_options(self, t):
         CFG.fix_groups = bool(self.groups_cb.IsChecked)
         CFG.merge_groups = bool(self.merge_cb.IsChecked)
+        CFG.delete_worksets = bool(self.delws_cb.IsChecked)
         CFG.skip_pinned = not self.pinned_cb.IsChecked
         CFG.model_only = bool(self.model_cb.IsChecked)
         CFG.combine = t.combine
@@ -166,7 +168,9 @@ class ElementRemoverWindow(forms.WPFWindow):
                 (", plus %d inside group instances removed as a whole" % plan["with_group"])
                 if plan["with_group"] else "",
                 ("\nIdentical regrouped instances will share one group type again; their members get new Element "
-                 "Ids, so tags on them go.") if plan["in_groups"] and self.merge_cb.IsChecked else ""),
+                 "Ids, so tags on them go.") if plan["in_groups"] and self.merge_cb.IsChecked else "") + (
+                ("\nThen these worksets are deleted if nothing is left on them: %s." % ", ".join(
+                    w["name"] for w in plan.get("worksets") or [])) if plan.get("worksets") else ""),
             title="Apply", yes=True, no=True)
 
     def run(self, action):

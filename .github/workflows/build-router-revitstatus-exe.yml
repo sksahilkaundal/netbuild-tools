@@ -54,6 +54,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         if: always()
+        continue-on-error: true
         with:
           name: router-smoke-screenshot
           path: router_setup.png
@@ -74,18 +75,24 @@ jobs:
           Get-ChildItem pkg -Recurse -File -Filter LICENSE.txt | Format-Table FullName, Length
 
       - uses: actions/upload-artifact@v4
+        # packages are stored only for main and manual runs (Actions storage quota)
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         with:
           name: RevitMcpRouter-by-Netbuild-windows
           path: pkg/router/
-          retention-days: 90
+          retention-days: 30
 
       - uses: actions/upload-artifact@v4
+        # packages are stored only for main and manual runs (Actions storage quota)
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         with:
           name: RevitStatus-by-Netbuild-windows
           path: pkg/status/
-          retention-days: 90
+          retention-days: 30
 
       - uses: actions/upload-artifact@v4
+        # packages are stored only for main and manual runs (Actions storage quota)
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         with:
           name: RevitStatus-KeyGen-developer-only
           path: pkg/keygen/
