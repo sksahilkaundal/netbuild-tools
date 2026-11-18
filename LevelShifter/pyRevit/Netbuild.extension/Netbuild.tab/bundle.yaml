@@ -1,5 +1,6 @@
 layout:
   - Levels
+  - Models
   - Areas
   - Sheets
   - Stairs

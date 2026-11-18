@@ -17,9 +17,11 @@ import os
 
 from pyrevit import forms
 
+import netbuild_about
 import netbuild_scripts as ns
+from netbuild_tools import about
 
-TITLE = "Netbuild script folder"
+TITLE = about.title("Script folder")
 EXT = ns.extension_root(__file__)
 
 SHOW_ALL = "Show folders and buttons found"
@@ -30,6 +32,7 @@ LIVE_OFF = "Live scripts: turn off"
 RESCAN = "Look in the folder again"
 CLEAR = "Clear my folder (use the default)"
 OTHERS = "Add live scripts to other extensions..."
+ABOUT = "About Netbuild Tools"
 SHOW = 30
 
 
@@ -58,7 +61,8 @@ def add_to_other_extensions():
 
 s = ns.settings(EXT)
 choice = forms.CommandSwitchWindow.show(
-    [SHOW_ALL, CHOOSE, ADD, LIVE_OFF if s["live"] else LIVE_ON, RESCAN, CLEAR, OTHERS], message=ns.summary(s))
+    [SHOW_ALL, CHOOSE, ADD, LIVE_OFF if s["live"] else LIVE_ON, RESCAN, CLEAR, OTHERS, ABOUT],
+    message=ns.summary(s))
 if choice in (CHOOSE, ADD):
     folder = forms.pick_folder(title="Folder with the Netbuild button folders (sub-folders are searched)")
     if folder:
@@ -69,6 +73,8 @@ elif choice == CLEAR:
     ns.save_settings(folders=[])
 elif choice == OTHERS:
     add_to_other_extensions()
-if choice and choice != OTHERS:
+elif choice == ABOUT:
+    netbuild_about.show(about)                  # its Licence button opens the Licence page
+if choice and choice not in (OTHERS, ABOUT):
     s = ns.settings(EXT)
     forms.alert(ns.describe(s, ns.rescan(s["folders"]) if s["folders"] else None), title=TITLE)

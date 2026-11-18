@@ -29,6 +29,7 @@ FEATURES = [
     "Check (plan only) -> Trial run (rolled back) -> Apply (one Undo entry: 'Element Remover by Netbuild')",
     "Elements inside model groups (nested too): ungrouped, removed, regrouped; group type names kept",
     "Identical regrouped instances share one group type again, checked member by member (option)",
+    "Delete the picked worksets once they are empty (option, Revit 2022+)",
     "Pinned elements, levels, grids, links and views are never removed unless asked (pinned) / at all",
     "Every element deleted is listed by Id, including the hosted / dependent ones Revit deletes with it",
 ]
@@ -50,6 +51,8 @@ REQUIREMENTS = [
         "Workshared: the worksets that hold the targets open; targets and their groups not borrowed by "
         "other users",
         "Save / Synchronize after Apply; Ctrl+Z in Revit undoes the whole removal",
+        "Deleting the emptied worksets (option): Revit 2022 or later; the workset not borrowed by another user "
+        "and not the active workset",
     ]),
 ]
 
@@ -59,6 +62,8 @@ Copyright (c) 2026 Netbuild. All rights reserved.
 Website: https://skaec.com
 
 This agreement covers every Netbuild software product -- including Level Shift by
+Netbuild, Model Prep by Netbuild, Align Viewports by Netbuild, BUA Update by
+Netbuild, Stair Path by Netbuild, Clear Warnings by Netbuild, Element Remover by
 Netbuild, Plot Runner by Netbuild, Revit MCP Router by Netbuild, Remote Router by
 Netbuild and Revit Status by Netbuild -- together with its updates and documentation
 (the "Software").

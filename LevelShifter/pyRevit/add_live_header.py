@@ -3,6 +3,7 @@
     python add_live_header.py "C:\\pyRevit-Extensions\\Netbuild 01.extension" "C:\\...\\Netbuild 02.extension"
     python add_live_header.py C:\\pyRevit-Extensions            (every .extension folder in it)
     add --apply to change the files; without it, only the list of files is shown.
+    python add_live_header.py about | licence | --version     (Netbuild Tools by Netbuild)
 
 Every pushbutton / panelbutton script.py and config.py gets, after its docstring and __title__ / __author__ lines:
 
@@ -20,9 +21,19 @@ LIB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Netbuild.extensi
 sys.path.insert(0, LIB)
 
 import netbuild_scripts as ns  # noqa: E402
+from netbuild_tools import about  # noqa: E402
 
 
 def main(argv):
+    if argv[:1] == ["about"]:
+        print(about.about_text())
+        return 0
+    if argv[:1] in (["license"], ["licence"]):
+        print(about.licence_text())
+        return 0
+    if argv[:1] == ["--version"]:
+        print(about.title())
+        return 0
     apply = "--apply" in argv
     folders = [a for a in argv if a != "--apply"]
     if not folders:

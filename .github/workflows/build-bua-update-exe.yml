@@ -53,7 +53,9 @@ jobs:
           (Get-Item "$app/BUA Update by Netbuild.exe").VersionInfo | Format-List CompanyName, ProductName, ProductVersion, LegalCopyright
 
       - uses: actions/upload-artifact@v4
+        # packages are stored only for main and manual runs (Actions storage quota)
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         with:
           name: BuaUpdate-by-Netbuild-windows
           path: pkg/
-          retention-days: 90
+          retention-days: 30

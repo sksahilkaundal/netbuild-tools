@@ -51,6 +51,8 @@ _WINDOW = '''<Window {ns}
                 Content="Elements inside model groups: ungroup, remove, regroup"/>
       <CheckBox x:Name="merge_cb" VerticalAlignment="Center" Margin="0,0,14,0"
                 Content="Merge identical regrouped group types (their members get new Element Ids)"/>
+      <CheckBox x:Name="delws_cb" VerticalAlignment="Center" Margin="0,0,14,0"
+                Content="Then delete the picked worksets once empty (Revit 2022+)"/>
       <CheckBox x:Name="pinned_cb" VerticalAlignment="Center" Margin="0,0,14,0"
                 Content="Remove pinned elements too (unpins them)"/>
       <CheckBox x:Name="model_cb" VerticalAlignment="Center"

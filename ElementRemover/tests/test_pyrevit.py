@@ -76,7 +76,8 @@ class ExtensionFileTests(unittest.TestCase):
         win = ET.fromstring(elementremover_ui.window_xaml())
         names = [e.get(pyrevit_stubs.X_NAME) for e in win.iter() if e.get(pyrevit_stubs.X_NAME)]
         self.assertEqual(len(names), len(set(names)))
-        for want in ("ws_lb", "flt_lb", "cat_tb", "any_rb", "all_rb", "groups_cb", "merge_cb", "pinned_cb", "model_cb",
+        for want in ("ws_lb", "flt_lb", "cat_tb", "any_rb", "all_rb", "groups_cb", "merge_cb", "delws_cb",
+                     "pinned_cb", "model_cb",
                      "check_btn", "trial_btn", "apply_btn", "about_btn", "licence_btn", "report_lb"):
             self.assertIn(want, names)
         lb = [e for e in win.iter() if e.get(pyrevit_stubs.X_NAME) == "ws_lb"][0]
@@ -98,7 +99,7 @@ class ExtensionFileTests(unittest.TestCase):
         self.assertIn('__author__ = "Netbuild -- skaec.com"\n\nimport netbuild_scripts\n'
                       'netbuild_scripts.run_live(globals())', src)          # runs from the script folder when set
         with open(os.path.join(EXT, "Netbuild.tab", "bundle.yaml")) as f:
-            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Areas", "-", "Sheets", "-", "Stairs",
+            self.assertEqual(f.read().split(), ["layout:", "-", "Levels", "-", "Models", "-", "Areas", "-", "Sheets", "-", "Stairs",
                                                 "-", "Warnings", "-", "Cleanup", "-", "Scripts", "-", "About"])  # About last
 
 
@@ -150,6 +151,7 @@ class ButtonTests(unittest.TestCase):
         self.assertIn("closed: Site", win.info_tb.Text)
         self.assertEqual((win.groups_cb.IsChecked, win.merge_cb.IsChecked, win.pinned_cb.IsChecked,
                           win.model_cb.IsChecked, win.any_rb.IsChecked), (True, True, False, True, True))
+        self.assertIs(win.delws_cb.IsChecked, False)                    # deleting worksets: opt in
         win.check_btn.click()                                           # nothing picked
         self.assertIn("[FAIL] Targets -- pick at least one workset or filter", self.report(win))
         win.walls_btn.click()
@@ -219,6 +221,20 @@ class ButtonTests(unittest.TestCase):
         self.assertNotIn("share one group type again", st.alerts[-1][1])
         self.assertIs(st.config.values["merge_groups"], False)
         self.assertIn("Toilet Core (2)", self.doc.type_names())         # one type per regrouped instance
+
+    def test_delete_worksets_checkbox(self):
+        from fake_revit import WorksetId
+        self.el["grid B"].WorksetId = WorksetId(1)                      # nothing protected left on Demolition
+        st, win = self.open_window()
+        self.pick(win.ws_lb, "Demolition")
+        win.pinned_cb.IsChecked = True
+        win.delws_cb.IsChecked = True
+        win.apply_btn.click()
+        self.assertIn("these worksets are deleted if nothing is left on them: Demolition", st.alerts[-1][1])
+        self.assertIs(st.config.values["delete_worksets"], True)
+        self.assertNotIn("Demolition", [w.Name for w in self.doc.worksets])
+        self.assertTrue([r for r in self.report(win) if r.startswith("[OK  ] Workset deleted -- 'Demolition'")])
+        self.assertFalse([i for i in win.ws_lb.Items if i.startswith("Demolition")])   # lists re-read
 
     def check_about(self, win):
         self.assertEqual(win.Title, "About Element Remover by Netbuild")

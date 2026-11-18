@@ -30,6 +30,8 @@ All three use the same engine (`level_shift/payload.py`), so the results are ide
    - `pyrevit extensions paths add "C:\pyRevit-Extensions"`.
 4. A **Netbuild** tab appears with these panels:
    - **Levels**, holding **Level Shift** and **Level Shift App**;
+   - **Models**, holding **Model Prep** and **Place Links** (*Model Prep by Netbuild*, see
+     [`ModelPrep.md`](pyRevit/ModelPrep.md));
    - **Areas**, holding **BUA Update** (opens BUA Update by Netbuild, see [`BuaUpdate/`](../BuaUpdate/README.md));
    - **Sheets**, holding **Align Viewports** (see [`AlignViewports/`](../AlignViewports/README.md));
    - **Stairs**, holding **Stair Path** (Stair Path by Netbuild -- see [`StairPath/README.md`](../StairPath/README.md));
@@ -48,6 +50,10 @@ elements without an offset parameter*, and *undo all if anything moves*. It writ
 CSVs to `%APPDATA%\Netbuild\LevelShift\logs`.
 
 ### Script folder: update every button from one place
+
+*Netbuild Tools by Netbuild 1.0.0* -- the Scripts panel and the Netbuild Tools 01 / 02 tabs are this product.
+Its About / Licence: **Netbuild -> About** (pick it from the list), **Script Folder -> About Netbuild Tools**,
+or `python add_live_header.py about | licence | --version`.
 
 Keep the current button folders in one place -- a network share, or a synced OneDrive / ACC / BIM 360
 folder -- in whatever sub-folders you like. A button is matched by its folder name, at any depth:
@@ -324,6 +330,8 @@ The tests cover:
 
 `tests\test_stair_path.py` covers Stair Path by Netbuild the same way, against its own stand-in model
 (`tests\fake_stairs.py`).
+
+`test_model_prep.py` covers Model Prep by Netbuild against its own stand-in model (`tests\fake_links.py`).
 
 ## About
 
