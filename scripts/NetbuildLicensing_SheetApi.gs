@@ -8,6 +8,11 @@
  *   Extensions > Apps Script > delete everything > paste this file > Save
  *   Deploy > New deployment > type: Web app > Execute as: Me > Who has access: Anyone > Deploy > authorise
  *   Copy the /exec URL into scripts\revitstatus_sheet_api.json and the KeyGen's sheet_api.json ("url").
+ *   Project Settings (gear) > Script Properties > add (the secrets are NOT in this file -- it is public):
+ *     TOKEN            the admin token (also "token" in sheet_api.json)
+ *     LICENCE_SHEET_ID the "Netbuild Licensing" spreadsheet id (also "sheet_id" in sheet_api.json)
+ *     SALT_BUA, SALT_RS, SALT_RMR   each app's password salt (pw_salt in netbuild_secrets.py)
+ *   Without them every request is refused.
  * Every request must carry TOKEN; the script runs under the sheet owner's account, so the sheet
  * itself stays private (apps only read the tab published to the web as CSV).
  *
@@ -32,7 +37,7 @@
  * Updating the code later: Deploy > Manage deployments > pencil > Version: New version > Deploy (keeps the URL).
  */
 var TOKEN = PropertiesService.getScriptProperties().getProperty("TOKEN");
-var LICENCE_SHEET_ID = "REMOVED";   // "Netbuild Licensing"
+var LICENCE_SHEET_ID = PropertiesService.getScriptProperties().getProperty("LICENCE_SHEET_ID");   // "Netbuild Licensing"
 var LICENCE_TAB_GID = 1189617866;                                       // the tab published as CSV
 var HEADER = ["Key", "Type", "Status", "Machine_ID", "Note", "Product"];
 
@@ -71,11 +76,12 @@ function _killState(product) {
   var st = String(sh.getRange(row, 3).getValue()).trim().toLowerCase();
   return ["revoked", "killed", "disabled", "off"].indexOf(st) >= 0 ? "killed" : "active";
 }
+function _prop(name) { return PropertiesService.getScriptProperties().getProperty(name) || ""; }
 // Products whose passwords lock to the first PC (salt = the app's password salt, name = Product column).
 var CLAIM_PRODUCTS = {
-  "BUA": { name: "BUA Workbook Builder", salt: "REMOVED" },
-  "RS":  { name: "Revit Status",         salt: "REMOVED" },
-  "RMR": { name: "Revit MCP Router",     salt: "REMOVED" }
+  "BUA": { name: "BUA Workbook Builder", salt: _prop("SALT_BUA") },
+  "RS":  { name: "Revit Status",         salt: _prop("SALT_RS") },
+  "RMR": { name: "Revit MCP Router",     salt: _prop("SALT_RMR") }
 };
 function _hex(bytes) {
   return bytes.map(function (b) { var v = (b < 0 ? b + 256 : b).toString(16); return v.length === 1 ? "0" + v : v; }).join("");
@@ -83,6 +89,7 @@ function _hex(bytes) {
 function _claim(p) {
   var prod = CLAIM_PRODUCTS[String(p.product || "").toUpperCase()];
   if (!prod) return { ok: false, error: "unknown product" };
+  if (!prod.salt) return { ok: false, error: "salt not set in Script Properties" };
   var pw = String(p.password || ""), mid = String(p.machine_id || "").trim().toUpperCase();
   if (!pw || mid.replace(/-/g, "").length !== 16) return { ok: false, error: "password and machine_id required" };
   var hash = _hex(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, prod.salt + "\u001f" + pw, Utilities.Charset.UTF_8));
@@ -104,7 +111,7 @@ function _handle(p) {
     lk.waitLock(10000);
     try { return _out(_claim(p)); } finally { lk.releaseLock(); }
   }
-  if (!p || p.token !== TOKEN) return _out({ ok: false, error: "bad token" });
+  if (!TOKEN || !p || p.token !== TOKEN) return _out({ ok: false, error: "bad token" });
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {

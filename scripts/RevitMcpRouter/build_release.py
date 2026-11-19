@@ -42,7 +42,8 @@ STAGE = os.path.join(SCRATCH, "stage")
 DIST = os.path.join(SCRATCH, "dist")
 PORTABLE = os.path.join(PROJECT, "Portable")
 APP_NAME = "Revit MCP Router"
-COMPILED = ["revit_mcp_router", "nb_license", "multimodel_core", "bridge_core", "install_revit_mcp_router", "setup_gui"]
+COMPILED = ["revit_mcp_router", "nb_license", "multimodel_core", "bridge_core", "install_revit_mcp_router", "setup_gui",
+            "netbuild_secrets"]   # licence secrets: never committed; the build needs netbuild_secrets.py here
 NO_DOCSTRINGS = {"revit_mcp_router", "nb_license", "multimodel_core", "install_revit_mcp_router", "setup_gui"}   # bridge_core keeps tool docstrings
 
 HIDDEN = [

@@ -95,10 +95,19 @@ COPYRIGHT = "© 2026 Netbuild. All rights reserved."   # informational in licens
 DEVELOPER_NAME = "Sahil Kaundal (Netbuild2026)"
 DEVELOPER_EMAIL = "info@skaec.com"
 LICENSE_FILE = "license.json"
-_PW_SALT = "REMOVED"
+# Licence secrets are NOT in the repository (it is public). They come from netbuild_secrets.py, which the
+# release build writes from the NETBUILD_SECRETS GitHub Actions secret (on the developer's PC it sits next to
+# these scripts, never committed). Without it nothing validates: no salt, no key, no password hashes, no
+# sheet -- the licence check fails closed.
+try:
+    from netbuild_secrets import SECRETS as _ALL_SECRETS
+except ImportError:
+    _ALL_SECRETS = {}
+_SECRETS = dict(_ALL_SECRETS.get('RS') or {})
+_PW_SALT = _SECRETS.get("pw_salt", "")
 # The key-signing secret is never stored as one literal: rebuilt at run time from
 # two arrays so a hex-editor search on the compiled module finds nothing.
-_K1 = b""  # removed (rotated; see netbuild_secrets)
+_K1 = bytes.fromhex(_SECRETS.get("k1", ""))   # first half of the signing secret (hex in netbuild_secrets)
 # _K2 is DERIVED at run time (never stored), so the two halves are not adjacent constants
 # in the compiled module. A compiled copy of this module imported from a foreign
 # interpreter (i.e. not one of our own frozen executables) yields a decoy secret, so
@@ -125,6 +134,8 @@ def _trusted_host():
 
 
 def _key_secret():
+    if not (_PW_SALT and _K1):
+        return os.urandom(32)             # no secrets: nothing can be signed or verified
     k2 = _k2()
     real = bytes(a ^ b for a, b in zip(_K1, k2))
     if _trusted_host():
@@ -138,17 +149,13 @@ def _key_secret():
 # reached the cached copy stays valid for LICENSE_CACHE_GRACE_DAYS.
 # ONE sheet for every Netbuild app ("Netbuild Licensing", first tab published as CSV) holds the
 # rows of all products; keys/hashes differ per product so rows never clash.
-LICENSE_SHEET_URL = ("https://docs.google.com/spreadsheets/d/e/"
-                     "REMOVED"
-                     "/pub?gid=1189617866&single=true&output=csv")
+LICENSE_SHEET_URL = _SECRETS.get("sheet_url", "")      # published CSV of the licence sheet
 LICENSE_SHEET_TIMEOUT_S = 6.0
 LICENSE_CACHE_GRACE_DAYS = 7
 LICENSE_CACHE_FILE = "license_cache.json"
 # Built-in fallback, used ONLY while the sheet has never been fetched on this PC
 # (e.g. first run with no network). Add with RevitStatus_KeyGen.py --hash.
-ALLOWED_PASSWORD_HASHES = {
-    "REMOVED",
-}
+ALLOWED_PASSWORD_HASHES = set(_SECRETS.get("password_hashes", ()))
 
 
 # --------------------------------------------------------------- helpers ---
@@ -929,8 +936,7 @@ def _cache_sig(fetched, rows):
 # POST {"action":"claim","product":CODE,"password":<plain>,"machine_id":MID}: the SCRIPT hashes the
 # password itself (only someone who knows it can claim), finds this product's active password row
 # and writes the Machine_ID if it is empty -> claimed | mine | other | revoked | unknown.
-LICENCE_API_URL = ("https://script.google.com/macros/s/"
-                   "REMOVED/exec")
+LICENCE_API_URL = _SECRETS.get("api_url", "")          # the licence sheet's Apps Script /exec URL
 CLAIM_PRODUCT_CODE = "RS"
 FRESH_ACTIVATION_GRACE_S = 30 * 60   # a brand-new password row takes minutes to reach the published copy
 

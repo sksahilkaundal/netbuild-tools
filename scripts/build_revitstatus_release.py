@@ -41,8 +41,9 @@ APP = "Revit Status"
 KEYGEN = "Revit Status KeyGen"
 KEYGEN_DIR = "Revit Status KeyGen (developer only)"
 CORE = "revitstatus_core"
+SECRETS = "netbuild_secrets"   # licence secrets: never committed; the build needs netbuild_secrets.py here
 
-HIDDEN = [CORE, "psutil", "pystray", "pystray._win32", "PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageTk", "PIL._tkinter_finder",
+HIDDEN = [CORE, SECRETS, "psutil", "pystray", "pystray._win32", "PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageTk", "PIL._tkinter_finder",
           "tkinter", "tkinter.ttk", "tkinter.messagebox", "urllib.request", "urllib.error", "csv", "hmac", "hashlib",
           "winreg", "socket", "uuid", "json", "ctypes", "threading", "queue", "datetime", "time", "webbrowser", "subprocess",
           "io", "string", "secrets", "revittools_theme"]
@@ -58,11 +59,15 @@ def run(cmd, **kw):
 
 def compile_core():
     os.makedirs(STAGE, exist_ok=True)
-    src = os.path.join(SRC, CORE + ".py")
-    out = [f for f in os.listdir(STAGE) if f.startswith(CORE + ".") and f.endswith(".pyd")]
-    if out and os.path.getmtime(os.path.join(STAGE, out[0])) > os.path.getmtime(src):
-        print("   %s up to date" % out[0])
-    else:
+    if not os.path.isfile(os.path.join(SRC, SECRETS + ".py")):
+        sys.exit("%s.py missing beside %s.py -- the licence secrets are not in the repository; "
+                 "put the file there (or set the NETBUILD_SECRETS secret for CI)" % (SECRETS, CORE))
+    for mod in (CORE, SECRETS):
+        src = os.path.join(SRC, mod + ".py")
+        out = [f for f in os.listdir(STAGE) if f.startswith(mod + ".") and f.endswith(".pyd")]
+        if out and os.path.getmtime(os.path.join(STAGE, out[0])) > os.path.getmtime(src):
+            print("   %s up to date" % out[0])
+            continue
         # --zig: without it newer Nuitka falls back to a downloaded MinGW whose headers can be incomplete
         run([sys.executable, "-m", "nuitka", "--module", "--zig", "--assume-yes-for-downloads", "--remove-output", "--quiet",
              "--python-flag=no_docstrings", "--output-dir=" + STAGE, src])
@@ -83,7 +88,7 @@ def freeze(name, entry, extra_hidden=()):
     app = os.path.join(DIST, name)
     for root, _, files in os.walk(app):
         for f in files:
-            if f in (CORE + ".py", CORE + ".pyc", "RevitStatus.pyw"):
+            if f in (CORE + ".py", CORE + ".pyc", SECRETS + ".py", SECRETS + ".pyc", "RevitStatus.pyw"):
                 sys.exit("source leaked into bundle: " + os.path.join(root, f))
     pyd = [os.path.join(root, f) for root, _, fs in os.walk(app) for f in fs if f.startswith(CORE + ".") and f.endswith(".pyd")]
     if not pyd:

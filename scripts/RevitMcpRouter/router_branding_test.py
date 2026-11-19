@@ -6,17 +6,17 @@
 * product name, version, owner, publisher, copyright, licence name and About / Licence content of the Setup app;
 * setup_gui.LICENSE_TEXT == LICENSE.txt beside this file == the repository's root LICENSE
   (the Netbuild Software Licence Agreement);
-* every value existing licences depend on is UNCHANGED: salts, product names/codes used in the
-  key derivation and the sheet, file names, the sheet / API URLs, the secret, and the outputs of
-  password_hash / machine_key / _sign for fixed inputs (golden values from v1.3.6). If one of these
-  fails, existing customers' keys, passwords or activations would stop working - fix the code,
-  never the expected value.
+* every value existing licences depend on is UNCHANGED (product code / name, file names and folders);
+* the licence secrets (salt, key, password hashes, sheet / API URLs) are NOT in the source: they load
+  from netbuild_secrets.py (written by the release build), and without it every check fails closed.
 Needs tkinter (setup_gui imports it); run from source (the compiled module gives a decoy secret).
 """
-import hashlib
+import importlib
 import inspect
 import os
+import re
 import sys
+import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -66,28 +66,74 @@ def test_license_text_equals_file():
 def test_licence_constants_unchanged():
     assert L.PRODUCT == "Revit MCP Router"                 # seed of _k2 and license.json "product"
     assert L.PRODUCT_CODE == "RMR"                         # Machine ID + sheet User-Agent
-    assert L.CLAIM_PRODUCT_CODE == "RMR"                   # Apps Script claim
-    assert L._PW_SALT == "REMOVED"
+    assert L.CLAIM_PRODUCT_CODE == "RMR"
     assert L._ALLOWED_EXES == ("Revit Status.exe", "Revit Status KeyGen.exe", "RevitMcpBridge.exe", "Revit MCP Router Setup.exe")
     assert L.LICENSE_FILE == "license.json"
     assert L.LICENSE_CACHE_FILE == "license_cache.json"
     assert L.LICENSE_CACHE_GRACE_DAYS == 7
     assert L.FRESH_ACTIVATION_GRACE_S == 1800
-    assert L.ALLOWED_PASSWORD_HASHES == {"REMOVED"}
-    assert L.LICENSE_SHEET_URL == ("https://docs.google.com/spreadsheets/d/e/REMOVED"
-                                   "REMOVED/pub?gid=1189617866&single=true&output=csv")
-    assert L.LICENCE_API_URL == ("https://script.google.com/macros/s/"
-                                 "REMOVED/exec")
     assert os.path.basename(L.license_dir()) == "RevitMcpRouter"
 
+# The licence secrets (salt, key, password hashes, sheet / API URLs) are not in the repository: they come from
+# netbuild_secrets.py, written by the release build. These tests swap in a fake netbuild_secrets module.
+FAKE = {"RMR": {"pw_salt": "test-salt", "k1": "0f" * 32,
+                 "password_hashes": ["ab" * 32], "sheet_url": "https://example.invalid/sheet.csv",
+                 "api_url": "https://example.invalid/exec"}}
 
-def test_key_outputs_unchanged():
-    assert hashlib.sha256(L._K1).hexdigest() == "REMOVED"
-    assert hashlib.sha256(L._k2()).hexdigest() == "REMOVED"
-    assert hashlib.sha256(L._key_secret()).hexdigest() == "REMOVED"
-    assert L.password_hash("test") == "REMOVED"
-    assert L.machine_key(MID) == "A4140-32367-A1AF0-5FC70"
-    assert L._sign({"hash": "key:" + MID, "machine_id": MID}) == "REMOVED"
+
+def _load(secrets):
+    """Re-import nb_license with netbuild_secrets.SECRETS == secrets (None: no netbuild_secrets module)."""
+    saved = sys.modules.get("netbuild_secrets")
+    if secrets is None:
+        sys.modules["netbuild_secrets"] = None          # import raises ImportError
+    else:
+        sys.modules["netbuild_secrets"] = types.SimpleNamespace(SECRETS=secrets)
+    try:
+        return importlib.reload(L)
+    finally:
+        if saved is None:
+            sys.modules.pop("netbuild_secrets", None)
+        else:
+            sys.modules["netbuild_secrets"] = saved
+
+
+def test_secrets_not_in_source():
+    with open(L.__file__, encoding="utf-8") as fh:
+        src = fh.read()
+    assert "from netbuild_secrets import SECRETS" in src
+    assert re.search(r'_PW_SALT\s*=\s*"[^"]', src) is None, "salt literal in source"
+    assert re.search(r'_K1\s*=\s*b["\']', src) is None, "key literal in source"
+    assert re.search(r'"[0-9a-f]{64}"', src) is None, "hash literal in source"
+
+
+def test_fails_closed_without_secrets():
+    for secrets in (None, {}):
+        M = _load(secrets)
+        assert M._PW_SALT == "" and M._K1 == b""
+        assert M.ALLOWED_PASSWORD_HASHES == set()
+        assert M.LICENSE_SHEET_URL == "" and M.LICENCE_API_URL == ""
+        assert M._key_secret() != M._key_secret(), "no secrets must give an unguessable, changing key"
+    _load(FAKE)
+    _load(None)
+
+
+def test_keys_come_from_secrets():
+    try:
+        M = _load(FAKE)
+        assert M._PW_SALT == "test-salt" and M._K1 == bytes.fromhex(FAKE["RMR"]["k1"])
+        assert M.ALLOWED_PASSWORD_HASHES == {"ab" * 32}
+        assert M.LICENSE_SHEET_URL == "https://example.invalid/sheet.csv"
+        assert M.LICENCE_API_URL == "https://example.invalid/exec"
+        assert M._key_secret() == M._key_secret()
+        key = M.machine_key(MID)
+        assert re.fullmatch(r"[0-9A-F]{5}(-[0-9A-F]{5}){3}", key) and key == M.machine_key(MID)
+        assert M.password_hash("test") == M.password_hash("test") != M.password_hash("other")
+        sig = M._sign({"hash": "key:" + MID, "machine_id": MID})
+        assert sig == M._sign({"hash": "key:" + MID, "machine_id": MID})
+        other = _load({"RMR": dict(FAKE["RMR"], k1="ff" * 32)})
+        assert other.machine_key(MID) != key, "the key must depend on the secret"
+    finally:
+        _load(None)
 
 
 def test_machine_id_derivation_unchanged():

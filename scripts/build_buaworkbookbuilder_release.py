@@ -41,7 +41,8 @@ DIST = os.path.join(SCRATCH, "dist")
 PORTABLE = os.path.join(PROJECT, "Portable")
 APP = "BUA Workbook Builder"
 ENTRY = "BuaWorkbookBuilder_Launcher.pyw"
-COMPILED = ["buawb_core", "BuaWorkbookBuilder_Engine", "bua_license"]
+COMPILED = ["buawb_core", "BuaWorkbookBuilder_Engine", "bua_license",
+            "netbuild_secrets"]   # licence secrets: never committed; the build needs netbuild_secrets.py here
 HIDDEN = COMPILED + ["revittools_theme", "openpyxl", "tkinter", "tkinter.ttk", "tkinter.filedialog",
                      "tkinter.messagebox", "tkinter.font", "queue", "threading", "subprocess", "json", "hashlib", "hmac",
                      "urllib.request", "urllib.error", "urllib.parse", "csv", "io", "socket", "uuid", "winreg",

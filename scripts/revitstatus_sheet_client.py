@@ -18,9 +18,20 @@ CONFIG_NAMES = ("sheet_api.json", "revitstatus_sheet_api.json")
 UA = "RevitStatus/1.0"
 
 # The ONE licence sheet every Netbuild app reads: "Netbuild Licensing" (its first tab is published as CSV).
-LICENCE_SHEET_ID = "REMOVED"
+# Its id is not in the repository (it is public): "sheet_id" in sheet_api.json, or NETBUILD_LICENCE_SHEET_ID.
+def _configured_sheet_id():
+    for p in _config_paths():
+        try:
+            with open(p, "r", encoding="utf-8") as fh:
+                sid = json.load(fh).get("sheet_id")
+            if sid:
+                return sid
+        except Exception:
+            continue
+    return os.environ.get("NETBUILD_LICENCE_SHEET_ID", "")
+
+
 LICENCE_SHEET_GID = 1189617866
-LICENCE_SHEET_URL = "https://docs.google.com/spreadsheets/d/%s/edit#gid=%d" % (LICENCE_SHEET_ID, LICENCE_SHEET_GID)
 _target = {"ok": False}      # set once the Apps Script has confirmed it writes to that sheet
 
 
@@ -35,6 +46,10 @@ def _config_paths():
         if b:
             out.extend(os.path.join(b, n) for n in CONFIG_NAMES)
     return out
+
+
+LICENCE_SHEET_ID = _configured_sheet_id()
+LICENCE_SHEET_URL = "https://docs.google.com/spreadsheets/d/%s/edit#gid=%d" % (LICENCE_SHEET_ID, LICENCE_SHEET_GID)
 
 
 def load_config():
@@ -86,6 +101,8 @@ def target_check(timeout=20):
     r = call("list", timeout=timeout)
     if not r.get("ok"):
         return False, r.get("error") or "no reply"
+    if not LICENCE_SHEET_ID:
+        return False, 'no "sheet_id" in sheet_api.json - add the Netbuild Licensing spreadsheet id there'
     if r.get("sheet_id") != LICENCE_SHEET_ID:
         return False, ("the sheet API writes to %s, not the Netbuild Licensing sheet the apps read - deploy "
                        "NetbuildLicensing_SheetApi.gs from that sheet (steps in its header), or edit the sheet by hand"

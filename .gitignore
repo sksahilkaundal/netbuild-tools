@@ -5,3 +5,7 @@ __pycache__/
 scripts/revitstatus_sheet_api.json
 scripts/license_cache.json
 .claude/worktrees/
+# Licence secrets (salts, keys, password hashes, sheet / API URLs): made by scripts/make_netbuild_secrets.py,
+# kept on the developer PC and in the NETBUILD_SECRETS Actions secret -- never in git (this repository is public)
+netbuild_secrets.py
+scripts/sheet_api.json

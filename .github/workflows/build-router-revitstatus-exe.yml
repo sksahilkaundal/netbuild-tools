@@ -41,10 +41,19 @@ jobs:
       - name: Install build tools
         run: python -m pip install nuitka ziglang pyinstaller "mcp[cli]<2" httpx psutil pystray pillow
 
-      - name: Branding / licence-compatibility tests (golden licence values)
+      - name: Branding / licence tests (secrets load from netbuild_secrets, fail closed without)
         run: |
           python scripts/RevitMcpRouter/router_branding_test.py
           python scripts/revitstatus_branding_test.py
+
+      # The licence secrets are not in the repository. NETBUILD_SECRETS (repo secret) holds the whole
+      # netbuild_secrets.py that scripts/make_netbuild_secrets.py writes; the builds compile it to a .pyd.
+      # Without it the exes still build, but every licence check fails closed (nothing activates).
+      - name: Licence secrets
+        env:
+          NETBUILD_SECRETS: ${{ secrets.NETBUILD_SECRETS }}
+        run: |
+          python -c "import os; s = os.environ.get('NETBUILD_SECRETS') or 'SECRETS = {}\n'; [open(p, 'w', encoding='utf-8').write(s) for p in ('scripts/netbuild_secrets.py', 'scripts/RevitMcpRouter/netbuild_secrets.py')]; print('::warning::NETBUILD_SECRETS is not set - these builds cannot validate any licence' if s.startswith('SECRETS = {}') else 'licence secrets written')"
 
       - name: Build Revit MCP Router by Netbuild
         run: python scripts/RevitMcpRouter/build_release.py --no-selftest

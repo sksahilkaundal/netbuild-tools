@@ -48,9 +48,18 @@ KILL_KEY = "BUA-KILL-SWITCH"
 _KILL_NORM = KILL_KEY.replace("-", "").upper()
 _KILLED_STATUSES = ("revoked", "killed", "disabled", "off")
 
-_PW_SALT = "REMOVED"
+# Licence secrets are NOT in the repository (it is public). They come from netbuild_secrets.py, which the
+# release build writes from the NETBUILD_SECRETS GitHub Actions secret (on the developer's PC it sits next to
+# these scripts, never committed). Without it nothing validates: no salt, no key, no password hashes, no
+# sheet -- the licence check fails closed.
+try:
+    from netbuild_secrets import SECRETS as _ALL_SECRETS
+except ImportError:
+    _ALL_SECRETS = {}
+_SECRETS = dict(_ALL_SECRETS.get('BUA') or {})
+_PW_SALT = _SECRETS.get("pw_salt", "")
 # The signing secret is never one literal: rebuilt at run time from _K1 and a derived _K2.
-_K1 = b""  # removed (rotated; see netbuild_secrets)
+_K1 = bytes.fromhex(_SECRETS.get("k1", ""))   # first half of the signing secret (hex in netbuild_secrets)
 # A compiled copy imported from anything but our own frozen exe gets a decoy secret,
 # so keys/signatures it produces or checks are invalid.
 _ALLOWED_EXES = ("BUA Workbook Builder.exe",)
@@ -74,6 +83,8 @@ def _trusted_host():
 
 
 def _key_secret():
+    if not (_PW_SALT and _K1):
+        return os.urandom(32)             # no secrets: nothing can be signed or verified
     real = bytes(a ^ b for a, b in zip(_K1, _k2()))
     if _trusted_host():
         return real
@@ -82,9 +93,7 @@ def _key_secret():
 
 # The ONE licence sheet every Netbuild app reads ("Netbuild Licensing", first tab published as CSV).
 # Columns: Key, Type, Status, Machine_ID, Note, Product.
-LICENSE_SHEET_URL = ("https://docs.google.com/spreadsheets/d/e/"
-                     "REMOVED"
-                     "/pub?gid=1189617866&single=true&output=csv")
+LICENSE_SHEET_URL = _SECRETS.get("sheet_url", "")      # published CSV of the licence sheet
 LICENSE_SHEET_TIMEOUT_S = 6.0
 LICENSE_CACHE_GRACE_DAYS = 3      # a killed/revoked copy kept offline stops after this many days
 
@@ -92,8 +101,7 @@ LICENSE_CACHE_GRACE_DAYS = 3      # a killed/revoked copy kept offline stops aft
 #   GET  ?action=kill&product=BUA  -> the kill row's state (unreachable -> the published CSV decides)
 #   POST {"action":"claim",...}    -> locks a one-PC password to the first PC that activates it
 #                                     (the script hashes the password itself; activation needs it)
-LICENCE_API_URL = ("https://script.google.com/macros/s/"
-                   "REMOVED/exec")
+LICENCE_API_URL = _SECRETS.get("api_url", "")          # the licence sheet's Apps Script /exec URL
 KILL_API_TIMEOUT_S = 8.0
 
 LICENSE_FILE = "license.json"

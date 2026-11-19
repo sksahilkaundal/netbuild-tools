@@ -13,6 +13,12 @@ Owner and publisher: **Netbuild**. Website: **https://skaec.com**. Brand: **Netb
 - Never change anything existing licence keys depend on (salts, secrets, key formats, Machine ID,
   product codes in the "Netbuild Licensing" sheet, licence/activation file names and folders) as part of
   branding or renaming -- split a display name from an identifier instead.
+- **This repository is public: no secret ever goes into it.** Licence salts, signing keys, password hashes and
+  the licence sheet / Apps Script URLs live in `netbuild_secrets.py` (git-ignored; made by
+  `scripts/make_netbuild_secrets.py`; CI writes it from the `NETBUILD_SECRETS` Actions secret), the Apps Script's
+  token / sheet id / salts in its Script Properties, the admin token and sheet id in `sheet_api.json`.
+  Licence code reads them from there and fails closed without them; release builds compile
+  `netbuild_secrets` to a `.pyd` like the licence modules. No client names or client data files either.
 
 ## Naming
 - Every product is named **"<Tool> by Netbuild"** -- e.g. *Level Shift by Netbuild*. Use that exact
